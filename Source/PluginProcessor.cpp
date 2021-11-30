@@ -95,6 +95,7 @@ void CompSoundFinalProjectAudioProcessor::prepareToPlay (double sampleRate, int 
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
+    auto settings = getSettings(apvts);
 }
 
 void CompSoundFinalProjectAudioProcessor::releaseResources()
@@ -134,7 +135,7 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
-
+    
     // In case we have more outputs than inputs, this code clears any output
     // channels that didn't contain input data, (because these aren't
     // guaranteed to be empty - they may contain garbage).
@@ -150,12 +151,8 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     // the samples and the outer loop is handling the channels.
     // Alternatively, you can process the samples with the channels
     // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
-    {
-        auto* channelData = buffer.getWritePointer (channel);
-
-        // ..do something to the data...
-    }
+    auto settings = getSettings(apvts);
+    buffer.applyGain(settings.gain);
 }
 
 //==============================================================================
@@ -182,6 +179,14 @@ void CompSoundFinalProjectAudioProcessor::setStateInformation (const void* data,
 {
     // You should use this method to restore your parameters from this memory block,
     // whose contents will have been created by the getStateInformation() call.
+}
+
+Settings getSettings(juce::AudioProcessorValueTreeState& apvts) {
+    Settings settings;
+    
+    settings.gain = apvts.getRawParameterValue("Gain")->load();
+    
+    return settings;
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout CompSoundFinalProjectAudioProcessor::createParameterLayout() {

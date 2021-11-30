@@ -11,6 +11,11 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 
+struct Settings {
+    float gain { 0 };
+};
+
+Settings getSettings(juce::AudioProcessorValueTreeState& apvts);
 //==============================================================================
 /**
 */
@@ -28,6 +33,8 @@ private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     CompSoundFinalProjectAudioProcessor& audioProcessor;
+    
+    using Gain = juce::dsp::Gain<float>;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CompSoundFinalProjectAudioProcessorEditor)
 };
