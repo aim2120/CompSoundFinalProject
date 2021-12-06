@@ -95,6 +95,12 @@ void CompSoundFinalProjectAudioProcessor::prepareToPlay (double sampleRate, int 
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
+    auto processSpec = juce::dsp::ProcessSpec();
+    processSpec.sampleRate = sampleRate;
+    processSpec.maximumBlockSize = samplesPerBlock;
+    processSpec.numChannels = getTotalNumInputChannels();
+    
+    processorChain.prepare(processSpec);
     auto settings = getSettings(apvts);
 }
 
@@ -153,6 +159,9 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     // interleaved by keeping the same state.
     auto settings = getSettings(apvts);
     buffer.applyGain(settings.gain);
+    
+    auto audioBlock = juce::dsp::AudioBlock<float>(buffer);
+    auto processContext = juce::dsp::ProcessContextReplacing<float>(audioBlock);
 }
 
 //==============================================================================

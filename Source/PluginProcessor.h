@@ -57,5 +57,6 @@ public:
 
 private:
     //==============================================================================
+    juce::dsp::ProcessorChain<juce::dsp::WaveShaper<float>> processorChain;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CompSoundFinalProjectAudioProcessor)
 };

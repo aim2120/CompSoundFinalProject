@@ -2,7 +2,7 @@
 
 <JUCERPROJECT id="Fc1Wxc" name="CompSoundFinalProject" projectType="audioplug"
               useAppConfig="0" addUsingNamespaceToJuceHeader="0" displaySplashScreen="1"
-              jucerFormatVersion="1" cppLanguageStandard="17">
+              jucerFormatVersion="1" cppLanguageStandard="17" pluginCharacteristicsValue="pluginProducesMidiOut,pluginWantsMidiIn">
   <MAINGROUP id="kDpcdH" name="CompSoundFinalProject">
     <GROUP id="{88CDE69D-73A8-92B8-EC35-84FC96CFC302}" name="Source">
       <FILE id="e7wDDn" name="PluginProcessor.cpp" compile="1" resource="0"
