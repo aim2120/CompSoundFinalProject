@@ -101,7 +101,25 @@ void CompSoundFinalProjectAudioProcessor::prepareToPlay (double sampleRate, int 
     processSpec.numChannels = getTotalNumInputChannels();
     
     processorChain.prepare(processSpec);
+    
     auto settings = getSettings(apvts);
+    
+    reverb.prepare(processSpec);
+    reverbParams.roomSize = settings.roomSize;
+    reverbParams.damping = settings.damping;
+    reverbParams.wetLevel = settings.wetLevel;
+    reverbParams.dryLevel = settings.dryLevel;
+    reverbParams.width = settings.width;
+    reverbParams.freezeMode = settings.freezeMode;
+    
+    reverbDelay = settings.delay;
+    
+    const int bufferSize = samplesPerBlock + sampleRate;
+    const int numInputChannels = getTotalNumInputChannels();
+    const int delayBufferSize = 2 * bufferSize;
+    
+    delayBuffer.setSize(numInputChannels, delayBufferSize);
+    delayBufferToRead.setSize(numInputChannels, bufferSize);
 }
 
 void CompSoundFinalProjectAudioProcessor::releaseResources()
@@ -150,18 +168,52 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     // this code if your algorithm always overwrites all the output channels.
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
-
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
+    
+    const int bufferLength = buffer.getNumSamples();
+    const int delayBufferLength = delayBuffer.getNumSamples();
+ 
+    for (int channel = 0; channel < totalNumInputChannels; ++channel) {
+        const float* bufferData = buffer.getReadPointer(channel);
+        const float* delayBufferData = delayBuffer.getReadPointer(channel);
+        fillDelayBuffer(channel, bufferLength, delayBufferLength, bufferData, delayBufferData);
+    }
+    
+    writePosition += bufferLength;
+    writePosition %= delayBufferLength;
+        
     auto settings = getSettings(apvts);
     buffer.applyGain(settings.gain);
     
-    auto audioBlock = juce::dsp::AudioBlock<float>(buffer);
+    auto audioBlock = juce::dsp::AudioBlock<float>(delayBufferToRead);
     auto processContext = juce::dsp::ProcessContextReplacing<float>(audioBlock);
+    reverb.setParameters(reverbParams);
+    reverb.process(processContext);
+}
+
+void CompSoundFinalProjectAudioProcessor::fillDelayBuffer(
+                                                          int channel,
+                                                          const int bufferLength,
+                                                          const int delayBufferLength,
+                                                          const float* bufferData,
+                                                          const float* delayBufferData
+                                                          ) {
+    if (delayBufferLength > bufferLength + writePosition) {
+        delayBuffer.copyFrom(channel, writePosition, bufferData, bufferLength);
+    } else {
+        int bufferRemaining = delayBufferLength - writePosition;
+        delayBuffer.copyFrom(channel, writePosition, bufferData, bufferRemaining);
+        delayBuffer.copyFrom(channel, 0, bufferData + bufferRemaining, bufferLength - bufferRemaining);
+    }
+    
+    int readPosition = (writePosition + (delayBufferLength - reverbDelay)) % delayBufferLength;
+    
+    if (delayBufferLength > bufferLength + readPosition) {
+        delayBufferToRead.copyFrom(channel, 0, delayBufferData + readPosition, bufferLength);
+    } else {
+        int bufferRemaining = delayBufferLength - readPosition;
+        delayBufferToRead.copyFrom(channel, 0, delayBufferData + readPosition, bufferRemaining);
+        delayBufferToRead.copyFrom(channel, bufferRemaining, delayBufferData + readPosition + bufferRemaining, bufferLength - bufferRemaining);
+    }
 }
 
 //==============================================================================
@@ -194,6 +246,13 @@ Settings getSettings(juce::AudioProcessorValueTreeState& apvts) {
     Settings settings;
     
     settings.gain = apvts.getRawParameterValue("Gain")->load();
+    settings.roomSize = apvts.getRawParameterValue("Room Size")->load();
+    settings.damping = apvts.getRawParameterValue("Damping")->load();
+    settings.wetLevel = apvts.getRawParameterValue("Wet Level")->load();
+    settings.dryLevel = apvts.getRawParameterValue("Dry Level")->load();
+    settings.width = apvts.getRawParameterValue("Width")->load();
+    settings.freezeMode = apvts.getRawParameterValue("Freeze Mode")->load();
+    settings.delay = apvts.getRawParameterValue("Delay")->load();
     
     return settings;
 }
@@ -206,6 +265,43 @@ juce::AudioProcessorValueTreeState::ParameterLayout CompSoundFinalProjectAudioPr
                                                            "Gain",
                                                            juce::NormalisableRange<float>(0.f, 1.f, 0.1f, 1.f),
                                                            0.5f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+                                                           "Room Size",
+                                                           "Room Size",
+                                                           juce::NormalisableRange<float>(0.f, 1.f, 0.1f, 1.f),
+                                                           0.5f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+                                                           "Damping",
+                                                           "Damping",
+                                                           juce::NormalisableRange<float>(0.f, 1.f, 0.1f, 1.f),
+                                                           0.5f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+                                                           "Wet Level",
+                                                           "Wet Level",
+                                                           juce::NormalisableRange<float>(0.f, 1.f, 0.1f, 1.f),
+                                                           0.5f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+                                                           "Dry Level",
+                                                           "Dry Level",
+                                                           juce::NormalisableRange<float>(0.f, 1.f, 0.1f, 1.f),
+                                                           0.5f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+                                                           "Width",
+                                                           "Width",
+                                                           juce::NormalisableRange<float>(0.f, 1.f, 0.1f, 1.f),
+                                                           0.5f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+                                                           "Freeze Mode",
+                                                           "Freeze Mode",
+                                                           juce::NormalisableRange<float>(0.f, 1.f, 0.1f, 1.f),
+                                                           0.5f));
+    
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+                                                           "Delay",
+                                                           "Delay",
+                                                           juce::NormalisableRange<float>(0.f, 1000.f, 1.f, 1.f),
+                                                           500.f));
+
     return layout;
 }
 

@@ -29,6 +29,7 @@ public:
    #endif
 
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    void fillDelayBuffer(int channel, const int bufferLength, const int delayBufferLength, const float* bufferData, const float* delayBufferData);
 
     //==============================================================================
     juce::AudioProcessorEditor* createEditor() override;
@@ -56,7 +57,18 @@ public:
     juce::AudioProcessorValueTreeState apvts {*this, nullptr, "Parameters", createParameterLayout()};
 
 private:
-    //==============================================================================
-    juce::dsp::ProcessorChain<juce::dsp::WaveShaper<float>> processorChain;
+    // circular buffer variables
+    juce::AudioBuffer<float> delayBuffer;
+    juce::AudioBuffer<float> delayBufferToRead;
+    int writePosition { 0 };
+    
+    // dsp effects variables
+        enum {
+        reverbIndex
+    };
+    juce::dsp::ProcessorChain<juce::dsp::Reverb> processorChain;
+    juce::dsp::Reverb reverb;
+    juce::dsp::Reverb::Parameters reverbParams;
+    int reverbDelay;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CompSoundFinalProjectAudioProcessor)
 };

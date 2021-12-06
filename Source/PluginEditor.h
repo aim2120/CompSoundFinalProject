@@ -13,6 +13,13 @@
 
 struct Settings {
     float gain { 0 };
+    float roomSize { 0 };
+    float damping { 0 };
+    float wetLevel { 0 };
+    float dryLevel { 0 };
+    float width { 0 };
+    float freezeMode { 0 };
+    float delay { 0 };
 };
 
 Settings getSettings(juce::AudioProcessorValueTreeState& apvts);
