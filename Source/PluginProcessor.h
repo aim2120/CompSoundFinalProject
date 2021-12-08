@@ -18,8 +18,19 @@ struct Settings {
     float dryLevel { 0 };
     float width { 0 };
     float freezeMode { 0 };
-    float delay { 0 };
+    float delayLength { 0 };
+    float numOfDelays { 0 };
 };
+
+const std::string GAIN = "Gain";
+const std::string ROOM_SIZE = "Room Size";
+const std::string DAMPING = "Damping";
+const std::string WET_LEVEL = "Wet Level";
+const std::string DRY_LEVEL = "Dry Level";
+const std::string WIDTH = "Width";
+const std::string FREEZE_MODE = "Freeze Mode";
+const std::string DELAY_LENGTH = "Delay Length (ms)";
+const std::string NUM_OF_DELAYS = "Number of Delays";
 
 //==============================================================================
 /**
@@ -40,7 +51,7 @@ public:
    #endif
 
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
-    void setReverbParameters(Settings);
+    void setReverbParameters();
     void fillDelayBuffer(juce::AudioBuffer<float>& buffer, int channel, const int bufferLength, const int delayBufferLength, const float* bufferData, const float* delayBufferData);
 
     //==============================================================================
@@ -81,6 +92,7 @@ private:
     juce::dsp::ProcessorChain<juce::dsp::Reverb> processorChain;
     juce::dsp::Reverb reverb;
     juce::dsp::Reverb::Parameters reverbParams;
-    int reverbDelay;
+    Settings settings;
+    
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CompSoundFinalProjectAudioProcessor)
 };
