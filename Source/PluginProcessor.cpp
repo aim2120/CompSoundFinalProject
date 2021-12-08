@@ -214,10 +214,11 @@ void CompSoundFinalProjectAudioProcessor::fillDelayBuffer(
         delayBuffer.copyFromWithRamp(channel, 0, bufferData + bufferRemaining, bufferLength - bufferRemaining, 0.8, 0.8);
     }
     
+    buffer.applyGain(channel, 0, bufferLength, (settings.dryLevel * 0.8));
     
     for (int i = 1; i < settings.numOfDelays; i++) {
         int readPosition = static_cast<int> ((writePosition + (delayBufferLength - (mSampleRate * (static_cast<int>(settings.delayLength) * i) / 1000))) % delayBufferLength);
-        float gain = 0.8 / i;
+        float gain = (settings.wetLevel * 0.8) / i;
         
         if (delayBufferLength > bufferLength + readPosition) {
             buffer.addFromWithRamp(channel, 0, delayBufferData + readPosition, bufferLength, gain, gain);
