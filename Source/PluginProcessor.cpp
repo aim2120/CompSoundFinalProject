@@ -171,6 +171,7 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     for (int channel = 0; channel < totalNumInputChannels; ++channel) {
         const float* bufferData = buffer.getReadPointer(channel);
         const float* delayBufferData = delayBuffer.getReadPointer(channel);
+        
         fillDelayBuffer(buffer, channel, bufferLength, delayBufferLength, bufferData, delayBufferData);
     }
     
@@ -215,14 +216,18 @@ void CompSoundFinalProjectAudioProcessor::fillDelayBuffer(
         delayBuffer.copyFromWithRamp(channel, 0, bufferData + bufferRemaining, bufferLength - bufferRemaining, 0.8, 0.8);
     }
     
-    int readPosition = static_cast<int> ((writePosition + (delayBufferLength - (mSampleRate * reverbDelay / 1000))) % delayBufferLength);
     
-    if (delayBufferLength > bufferLength + readPosition) {
-        buffer.addFromWithRamp(channel, 0, delayBufferData + readPosition, bufferLength, 0.8, 0.8);
-    } else {
-        int bufferRemaining = delayBufferLength - readPosition;
-        buffer.addFromWithRamp(channel, 0, delayBufferData + readPosition, bufferRemaining, 0.8, 0.8);
-        buffer.addFromWithRamp(channel, bufferRemaining, delayBufferData, bufferLength - bufferRemaining, 0.8, 0.8);
+    for (int i = 1; i < 5; i++) {
+        int readPosition = static_cast<int> ((writePosition + (delayBufferLength - (mSampleRate * (reverbDelay * i) / 1000))) % delayBufferLength);
+        float gain = 0.8 / i;
+        
+        if (delayBufferLength > bufferLength + readPosition) {
+            buffer.addFromWithRamp(channel, 0, delayBufferData + readPosition, bufferLength, gain, gain);
+        } else {
+            int bufferRemaining = delayBufferLength - readPosition;
+            buffer.addFromWithRamp(channel, 0, delayBufferData + readPosition, bufferRemaining, gain, gain);
+            buffer.addFromWithRamp(channel, bufferRemaining, delayBufferData, bufferLength - bufferRemaining, gain, gain);
+        }
     }
 }
 
@@ -309,8 +314,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout CompSoundFinalProjectAudioPr
     layout.add(std::make_unique<juce::AudioParameterFloat>(
                                                            "Delay",
                                                            "Delay",
-                                                           juce::NormalisableRange<float>(0.f, 1000.f, 1.f, 1.f),
-                                                           500.f));
+                                                           juce::NormalisableRange<float>(0.f, 500.f, 1.f, 1.f),
+                                                           100.f));
 
     return layout;
 }
