@@ -10,6 +10,17 @@
 
 #include <JuceHeader.h>
 
+struct Settings {
+    float gain { 0 };
+    float roomSize { 0 };
+    float damping { 0 };
+    float wetLevel { 0 };
+    float dryLevel { 0 };
+    float width { 0 };
+    float freezeMode { 0 };
+    float delay { 0 };
+};
+
 //==============================================================================
 /**
 */
@@ -29,7 +40,8 @@ public:
    #endif
 
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
-    void fillDelayBuffer(int channel, const int bufferLength, const int delayBufferLength, const float* bufferData, const float* delayBufferData);
+    void setReverbParameters(Settings);
+    void fillDelayBuffer(juce::AudioBuffer<float>& buffer, int channel, const int bufferLength, const int delayBufferLength, const float* bufferData, const float* delayBufferData);
 
     //==============================================================================
     juce::AudioProcessorEditor* createEditor() override;
@@ -59,8 +71,8 @@ public:
 private:
     // circular buffer variables
     juce::AudioBuffer<float> delayBuffer;
-    juce::AudioBuffer<float> delayBufferToRead;
     int writePosition { 0 };
+    int mSampleRate;
     
     // dsp effects variables
         enum {

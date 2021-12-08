@@ -95,31 +95,24 @@ void CompSoundFinalProjectAudioProcessor::prepareToPlay (double sampleRate, int 
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
+    mSampleRate = sampleRate;
+    
     auto processSpec = juce::dsp::ProcessSpec();
+    
     processSpec.sampleRate = sampleRate;
     processSpec.maximumBlockSize = samplesPerBlock;
     processSpec.numChannels = getTotalNumInputChannels();
     
     processorChain.prepare(processSpec);
+    reverb.prepare(processSpec);
     
     auto settings = getSettings(apvts);
-    
-    reverb.prepare(processSpec);
-    reverbParams.roomSize = settings.roomSize;
-    reverbParams.damping = settings.damping;
-    reverbParams.wetLevel = settings.wetLevel;
-    reverbParams.dryLevel = settings.dryLevel;
-    reverbParams.width = settings.width;
-    reverbParams.freezeMode = settings.freezeMode;
-    
-    reverbDelay = settings.delay;
-    
-    const int bufferSize = samplesPerBlock + sampleRate;
+    setReverbParameters(settings);
+   
     const int numInputChannels = getTotalNumInputChannels();
-    const int delayBufferSize = 2 * bufferSize;
+    const int delayBufferSize = 2 * (samplesPerBlock + sampleRate);
     
     delayBuffer.setSize(numInputChannels, delayBufferSize);
-    delayBufferToRead.setSize(numInputChannels, bufferSize);
 }
 
 void CompSoundFinalProjectAudioProcessor::releaseResources()
@@ -160,6 +153,9 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
     
+    const int bufferLength = buffer.getNumSamples();
+    const int delayBufferLength = delayBuffer.getNumSamples();
+    
     // In case we have more outputs than inputs, this code clears any output
     // channels that didn't contain input data, (because these aren't
     // guaranteed to be empty - they may contain garbage).
@@ -167,30 +163,44 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     // when they first compile a plugin, but obviously you don't need to keep
     // this code if your algorithm always overwrites all the output channels.
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
+        buffer.clear(i, 0, bufferLength);
     
-    const int bufferLength = buffer.getNumSamples();
-    const int delayBufferLength = delayBuffer.getNumSamples();
+    auto settings = getSettings(apvts);
+    setReverbParameters(settings);
  
     for (int channel = 0; channel < totalNumInputChannels; ++channel) {
         const float* bufferData = buffer.getReadPointer(channel);
         const float* delayBufferData = delayBuffer.getReadPointer(channel);
-        fillDelayBuffer(channel, bufferLength, delayBufferLength, bufferData, delayBufferData);
+        fillDelayBuffer(buffer, channel, bufferLength, delayBufferLength, bufferData, delayBufferData);
     }
     
     writePosition += bufferLength;
     writePosition %= delayBufferLength;
         
-    auto settings = getSettings(apvts);
     buffer.applyGain(settings.gain);
     
-    auto audioBlock = juce::dsp::AudioBlock<float>(delayBufferToRead);
+    auto audioBlock = juce::dsp::AudioBlock<float>(buffer);
     auto processContext = juce::dsp::ProcessContextReplacing<float>(audioBlock);
+    //reverb.setParameters(reverbParams);
+    //reverb.process(processContext);
+    
+}
+
+void CompSoundFinalProjectAudioProcessor::setReverbParameters(Settings settings) {
+    reverbParams.roomSize = settings.roomSize;
+    reverbParams.damping = settings.damping;
+    reverbParams.wetLevel = settings.wetLevel;
+    reverbParams.dryLevel = settings.dryLevel;
+    reverbParams.width = settings.width;
+    reverbParams.freezeMode = settings.freezeMode;
+    
     reverb.setParameters(reverbParams);
-    reverb.process(processContext);
+    
+    reverbDelay = settings.delay;
 }
 
 void CompSoundFinalProjectAudioProcessor::fillDelayBuffer(
+                                                          juce::AudioBuffer<float>& buffer,
                                                           int channel,
                                                           const int bufferLength,
                                                           const int delayBufferLength,
@@ -198,21 +208,21 @@ void CompSoundFinalProjectAudioProcessor::fillDelayBuffer(
                                                           const float* delayBufferData
                                                           ) {
     if (delayBufferLength > bufferLength + writePosition) {
-        delayBuffer.copyFrom(channel, writePosition, bufferData, bufferLength);
+        delayBuffer.copyFromWithRamp(channel, writePosition, bufferData, bufferLength, 0.8, 0.8);
     } else {
         int bufferRemaining = delayBufferLength - writePosition;
-        delayBuffer.copyFrom(channel, writePosition, bufferData, bufferRemaining);
-        delayBuffer.copyFrom(channel, 0, bufferData + bufferRemaining, bufferLength - bufferRemaining);
+        delayBuffer.copyFromWithRamp(channel, writePosition, bufferData, bufferRemaining, 0.8, 0.8);
+        delayBuffer.copyFromWithRamp(channel, 0, bufferData + bufferRemaining, bufferLength - bufferRemaining, 0.8, 0.8);
     }
     
-    int readPosition = (writePosition + (delayBufferLength - reverbDelay)) % delayBufferLength;
+    int readPosition = static_cast<int> ((writePosition + (delayBufferLength - (mSampleRate * reverbDelay / 1000))) % delayBufferLength);
     
     if (delayBufferLength > bufferLength + readPosition) {
-        delayBufferToRead.copyFrom(channel, 0, delayBufferData + readPosition, bufferLength);
+        buffer.addFromWithRamp(channel, 0, delayBufferData + readPosition, bufferLength, 0.8, 0.8);
     } else {
         int bufferRemaining = delayBufferLength - readPosition;
-        delayBufferToRead.copyFrom(channel, 0, delayBufferData + readPosition, bufferRemaining);
-        delayBufferToRead.copyFrom(channel, bufferRemaining, delayBufferData + readPosition + bufferRemaining, bufferLength - bufferRemaining);
+        buffer.addFromWithRamp(channel, 0, delayBufferData + readPosition, bufferRemaining, 0.8, 0.8);
+        buffer.addFromWithRamp(channel, bufferRemaining, delayBufferData, bufferLength - bufferRemaining, 0.8, 0.8);
     }
 }
 
