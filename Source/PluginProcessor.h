@@ -22,6 +22,8 @@ struct Settings {
     float numOfDelays { 0 };
 };
 
+Settings getSettings(juce::AudioProcessorValueTreeState& apvts);
+
 const std::string GAIN = "Gain";
 const std::string ROOM_SIZE = "Room Size";
 const std::string DAMPING = "Damping";

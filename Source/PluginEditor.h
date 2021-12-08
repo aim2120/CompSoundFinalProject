@@ -12,7 +12,6 @@
 #include "PluginProcessor.h"
 
 
-Settings getSettings(juce::AudioProcessorValueTreeState& apvts);
 //==============================================================================
 /**
 */
