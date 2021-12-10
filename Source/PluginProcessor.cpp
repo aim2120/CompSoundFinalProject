@@ -113,6 +113,16 @@ void CompSoundFinalProjectAudioProcessor::prepareToPlay (double sampleRate, int 
     const int delayBufferSize = 2 * (samplesPerBlock + sampleRate);
     
     delayBuffer.setSize(numInputChannels, delayBufferSize);
+    
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+            if (i == j) {
+                householderMatrix(i, j) = 0.75;
+            } else {
+                householderMatrix(i, j) = -0.25;
+            }
+        }
+    }
 }
 
 void CompSoundFinalProjectAudioProcessor::releaseResources()
@@ -167,12 +177,13 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     
     settings = getSettings(apvts);
     setReverbParameters();
- 
+    
     for (int channel = 0; channel < totalNumInputChannels; ++channel) {
         const float* bufferData = buffer.getReadPointer(channel);
         const float* delayBufferData = delayBuffer.getReadPointer(channel);
         
-        fillDelayBuffer(buffer, channel, bufferLength, delayBufferLength, bufferData, delayBufferData);
+        fillDelayBuffer(channel, bufferLength, delayBufferLength, bufferData);
+        addFromDelayBuffer(buffer, channel, bufferLength, delayBufferLength, delayBufferData, 1.0);
     }
     
     writePosition += bufferLength;
@@ -199,12 +210,10 @@ void CompSoundFinalProjectAudioProcessor::setReverbParameters() {
 }
 
 void CompSoundFinalProjectAudioProcessor::fillDelayBuffer(
-                                                          juce::AudioBuffer<float>& buffer,
                                                           int channel,
                                                           const int bufferLength,
                                                           const int delayBufferLength,
-                                                          const float* bufferData,
-                                                          const float* delayBufferData
+                                                          const float* bufferData
                                                           ) {
     if (delayBufferLength > bufferLength + writePosition) {
         delayBuffer.copyFromWithRamp(channel, writePosition, bufferData, bufferLength, 0.8, 0.8);
@@ -213,12 +222,22 @@ void CompSoundFinalProjectAudioProcessor::fillDelayBuffer(
         delayBuffer.copyFromWithRamp(channel, writePosition, bufferData, bufferRemaining, 0.8, 0.8);
         delayBuffer.copyFromWithRamp(channel, 0, bufferData + bufferRemaining, bufferLength - bufferRemaining, 0.8, 0.8);
     }
+}
     
-    buffer.applyGain(channel, 0, bufferLength, (settings.dryLevel * 0.8));
+
+void CompSoundFinalProjectAudioProcessor::addFromDelayBuffer(
+                                                             juce::AudioBuffer<float>& buffer,
+                                                             int channel,
+                                                             const int bufferLength,
+                                                             const int delayBufferLength,
+                                                             const float* delayBufferData,
+                                                             const float gainMultiplier
+                                                             ) {
+    buffer.applyGain(channel, 0, bufferLength, (settings.dryLevel * 0.8 * gainMultiplier));
     
     for (int i = 1; i < settings.numOfDelays; i++) {
         int readPosition = static_cast<int> ((writePosition + (delayBufferLength - (mSampleRate * (static_cast<int>(settings.delayLength) * i) / 1000))) % delayBufferLength);
-        float gain = (settings.wetLevel * 0.8) / i;
+        float gain = (settings.wetLevel * 0.8 * gainMultiplier) / i;
         
         if (delayBufferLength > bufferLength + readPosition) {
             buffer.addFromWithRamp(channel, 0, delayBufferData + readPosition, bufferLength, gain, gain);

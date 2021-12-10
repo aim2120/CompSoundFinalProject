@@ -54,7 +54,8 @@ public:
 
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
     void setReverbParameters();
-    void fillDelayBuffer(juce::AudioBuffer<float>& buffer, int channel, const int bufferLength, const int delayBufferLength, const float* bufferData, const float* delayBufferData);
+    void fillDelayBuffer(int channel, const int bufferLength, const int delayBufferLength, const float* bufferData);
+    void addFromDelayBuffer(juce::AudioBuffer<float>& buffer, int channel, const int bufferLength, const int delayBufferLength, const float* delayBufferData, const float gainMultiplier);
 
     //==============================================================================
     juce::AudioProcessorEditor* createEditor() override;
@@ -95,6 +96,9 @@ private:
     juce::dsp::Reverb reverb;
     juce::dsp::Reverb::Parameters reverbParams;
     Settings settings;
+    
+    // diffuser variables
+    juce::dsp::Matrix<float> householderMatrix = juce::dsp::Matrix<float>(8,8);
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CompSoundFinalProjectAudioProcessor)
 };
