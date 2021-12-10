@@ -110,10 +110,12 @@ void CompSoundFinalProjectAudioProcessor::prepareToPlay (double sampleRate, int 
     setReverbParameters();
    
     const int numInputChannels = getTotalNumInputChannels();
-    const int delayBufferSize = 2 * (samplesPerBlock + sampleRate);
+    const int delayBufferLength = 2 * (samplesPerBlock + sampleRate);
     
-    delayBuffer.setSize(numInputChannels, delayBufferSize);
-    
+    delayBuffer.setSize(numInputChannels, delayBufferLength);
+    multiChannelBuffer.setSize(MULTICHANNEL_TOTAL_INPUTS, samplesPerBlock);
+    multiChannelDelayBuffer.setSize(MULTICHANNEL_TOTAL_INPUTS, delayBufferLength);
+
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
             if (i == j) {
@@ -178,12 +180,33 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     settings = getSettings(apvts);
     setReverbParameters();
     
+    // fill the delay buffer with the current buffer's data
     for (int channel = 0; channel < totalNumInputChannels; ++channel) {
         const float* bufferData = buffer.getReadPointer(channel);
-        const float* delayBufferData = delayBuffer.getReadPointer(channel);
-        
         fillDelayBuffer(channel, bufferLength, delayBufferLength, bufferData);
-        addFromDelayBuffer(buffer, channel, bufferLength, delayBufferLength, delayBufferData, 1.0);
+    }
+   
+    
+    // convert the buffer and delay buffer to multiChannel
+    for (int channel = 0; channel < MULTICHANNEL_TOTAL_INPUTS; ++channel) {
+        int originalChannel = channel % totalNumInputChannels;
+        const float* bufferData = buffer.getReadPointer(originalChannel);
+        const float* delayBufferData = delayBuffer.getReadPointer(originalChannel);
+        multiChannelBuffer.copyFrom(channel, 0, bufferData, bufferLength);
+        multiChannelDelayBuffer.copyFrom(channel, 0, delayBufferData, delayBufferLength);
+        
+        //addFromDelayBuffer(multiChannelBuffer, channel, bufferLength, delayBufferLength, delayBufferData, 1.0);
+    }
+    
+    for (int i = 0; i < bufferLength; ++i) {
+        
+    }
+    
+    // condense the multiChannel buffer data back into the original buffer
+    for (int channel = 0; channel < MULTICHANNEL_TOTAL_INPUTS; ++channel) {
+        int originalChannel = channel % totalNumInputChannels;
+        const float* bufferData = multiChannelBuffer.getReadPointer(channel);
+        buffer.copyFrom(originalChannel, 0, bufferData, bufferLength);
     }
     
     writePosition += bufferLength;

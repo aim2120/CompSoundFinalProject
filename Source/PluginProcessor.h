@@ -34,6 +34,8 @@ const std::string FREEZE_MODE = "Freeze Mode";
 const std::string DELAY_LENGTH = "Delay Length (ms)";
 const std::string NUM_OF_DELAYS = "Number of Delays";
 
+const int MULTICHANNEL_TOTAL_INPUTS = 8;
+
 //==============================================================================
 /**
 */
@@ -85,6 +87,8 @@ public:
 private:
     // circular buffer variables
     juce::AudioBuffer<float> delayBuffer;
+    juce::AudioBuffer<float> multiChannelBuffer;
+    juce::AudioBuffer<float> multiChannelDelayBuffer;
     int writePosition { 0 };
     int mSampleRate;
     
@@ -98,7 +102,7 @@ private:
     Settings settings;
     
     // diffuser variables
-    juce::dsp::Matrix<float> householderMatrix = juce::dsp::Matrix<float>(8,8);
+    juce::dsp::Matrix<float> householderMatrix { juce::dsp::Matrix<float>(8,8) };
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CompSoundFinalProjectAudioProcessor)
 };
