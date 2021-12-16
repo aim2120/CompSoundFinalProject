@@ -34,7 +34,8 @@ const std::string FREEZE_MODE = "Freeze Mode";
 const std::string DELAY_LENGTH = "Delay Length (ms)";
 const std::string NUM_OF_DELAYS = "Number of Delays";
 
-const int MULTICHANNEL_TOTAL_INPUTS = 8;
+const int MULTICHANNEL_TOTAL_INPUTS = 4;
+const int MATRIX_SIZE = 4;
 
 //==============================================================================
 /**
@@ -58,6 +59,7 @@ public:
     void setReverbParameters();
     void fillDelayBuffer(int channel, const int bufferLength, const int delayBufferLength, const float* bufferData);
     void addFromDelayBuffer(juce::AudioBuffer<float>& buffer, int channel, const int bufferLength, const int delayBufferLength, const float* delayBufferData, const float gainMultiplier);
+    void addFromDelayBuffer(float** bufferDataArr, float** delayBufferDataArr, const int readPosition, const int bufferIndex);
 
     //==============================================================================
     juce::AudioProcessorEditor* createEditor() override;
@@ -88,6 +90,7 @@ private:
     // circular buffer variables
     juce::AudioBuffer<float> delayBuffer;
     juce::AudioBuffer<float> multiChannelBuffer;
+    juce::AudioBuffer<float> multiChannelDiffusedBuffer;
     juce::AudioBuffer<float> multiChannelDelayBuffer;
     int writePosition { 0 };
     int mSampleRate;
@@ -102,7 +105,9 @@ private:
     Settings settings;
     
     // diffuser variables
-    juce::dsp::Matrix<float> householderMatrix { juce::dsp::Matrix<float>(8,8) };
+    juce::dsp::Matrix<float> householderMatrix { juce::dsp::Matrix<float>(MATRIX_SIZE, MATRIX_SIZE) };
+    juce::dsp::Matrix<float> currentStepMatrix { juce::dsp::Matrix<float>(MATRIX_SIZE, MATRIX_SIZE) };
+    //juce::dsp::Matrix<float> currentStepMatrixOutput { juce::dsp::Matrix<float>(MATRIX_SIZE, MATRIX_SIZE) };
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CompSoundFinalProjectAudioProcessor)
 };
