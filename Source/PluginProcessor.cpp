@@ -120,10 +120,21 @@ void CompSoundFinalProjectAudioProcessor::prepareToPlay (double sampleRate, int 
     for (int i = 0; i < MATRIX_SIZE; i++) {
         for (int j = 0; j < MATRIX_SIZE; j++) {
             if (i == j) {
-                householderMatrix(i, j) = 0.75;
+                householderMatrix(i, j) = 0.5;
             } else {
-                householderMatrix(i, j) = -0.25;
+                householderMatrix(i, j) = -0.5;
             }
+            currentStepMatrix(i, j) = i + j;
+        }
+    }
+    
+    currentStepMatrixOutput = currentStepMatrix * householderMatrix;
+    
+    for (int i = 0; i < MATRIX_SIZE; i++) {
+        for (int j = 0; j < MATRIX_SIZE; j++) {
+            std::cout << "currentStep: " << currentStepMatrix(i, j) << std::endl;
+            std::cout << "householder: " << householderMatrix(i, j) << std::endl;
+            std::cout << "output: " << currentStepMatrixOutput(i, j) << std::endl;
         }
     }
 }
@@ -291,9 +302,11 @@ void CompSoundFinalProjectAudioProcessor::addFromDelayBuffer(
         }
     }
     
+    currentStepMatrixOutput = currentStepMatrix * householderMatrix;
+    
     for (int i = 0; i < MATRIX_SIZE; ++i) {
         for (int j = 0; j < MATRIX_SIZE; ++j) {
-            bufferDataArr[j][bufferIndex] += (currentStepMatrix(i, j) * (wetGain / settings.numOfDelays));
+            bufferDataArr[j][bufferIndex] += (currentStepMatrixOutput(i, j) * (wetGain / settings.numOfDelays));
         }
     }
 }
