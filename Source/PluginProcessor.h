@@ -116,6 +116,7 @@ private:
     // diffuser variables
     juce::dsp::Matrix<float> householderMatrix { juce::dsp::Matrix<float>(MATRIX_SIZE, MATRIX_SIZE) };
     juce::dsp::Matrix<float> hadamardMatrix { juce::dsp::Matrix<float>(MATRIX_SIZE, MATRIX_SIZE) };
+    juce::dsp::Matrix<float> permutationMatrix { juce::dsp::Matrix<float>(MATRIX_SIZE, MATRIX_SIZE) };
     juce::dsp::Matrix<float> currentStepMatrix { juce::dsp::Matrix<float>(MATRIX_SIZE, MATRIX_SIZE) };
     juce::dsp::Matrix<float> currentStepMatrixOutput { juce::dsp::Matrix<float>(MATRIX_SIZE, MATRIX_SIZE) };
     

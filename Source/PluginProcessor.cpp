@@ -140,6 +140,18 @@ void CompSoundFinalProjectAudioProcessor::prepareToPlay (double sampleRate, int 
             }
         }
     }
+    
+    for (int i = 0; i < MATRIX_SIZE; i++) {
+        for (int j = 0; j < MATRIX_SIZE; j++) {
+            permutationMatrix(i, j) = 0;
+        }
+    }
+    
+    // statically setting for now
+    permutationMatrix(0,3) = 1;
+    permutationMatrix(1,2) = 1;
+    permutationMatrix(2,0) = 1;
+    permutationMatrix(3,1) = 1;
 }
 
 void CompSoundFinalProjectAudioProcessor::releaseResources()
@@ -341,25 +353,11 @@ void CompSoundFinalProjectAudioProcessor::diffuseBuffer(
             diffusedBufferDataArr[i][j] = delayBufferDataArr[i][readPosition];
         }
     }
-    
-    // swap channels and invert polarity randomly
-    for (int i = 0; i < bufferLength; ++i) {
-        const int randomChannel1 = rand() % MULTICHANNEL_TOTAL_INPUTS;
-        const int randomChannel2 = rand() % MULTICHANNEL_TOTAL_INPUTS;
-        
-        diffusedBufferDataArr[randomChannel1][i] = diffusedBufferDataArr[randomChannel2][i];
-        /*
-        if (rand() % 2) {
-            diffusedBufferDataArr[randomChannel1][i] = diffusedBufferDataArr[randomChannel2][i];
-        } else {
-            diffusedBufferDataArr[randomChannel1][i] = -1 * diffusedBufferDataArr[randomChannel2][i];
-        }
-         */
-    }
-    
-    // mix with hadamard matrix
+   
+    // mix with permutation & hadamard matrix
     for (int i = 0; i < bufferLength; ++i) {
         copyToMatrix(currentStepMatrix, diffusedBufferDataArr, i);
+        currentStepMatrix = currentStepMatrix * permutationMatrix;
         currentStepMatrixOutput = currentStepMatrix * hadamardMatrix;
         copyFromMatrix(currentStepMatrixOutput, diffusedBufferDataArr, i);
     }
@@ -372,13 +370,15 @@ void CompSoundFinalProjectAudioProcessor::addFromDelayBuffer(
                                                              const int bufferIndex,
                                                              const int delay
                                                              ) {
-    const float wetGain = (settings.wetLevel * 0.8) / settings.numOfDelays;
     /*
     const float baseWetGain = (settings.wetLevel * 0.8);
-    const float decayAmount = baseWetGain * std::min((delay / settings.decay), (float)1.0);
-    const float gateCutoffAmount = baseWetGain * (1 / (settings.gateCutoff - std::min((float)delay, (float)(settings.gateCutoff - 1))));
-    const float wetGain = (baseWetGain - decayAmount - gateCutoffAmount) / (float)settings.numOfDelays;
+    // linearly increases to 1 as delay approaches decay
+    const float decayAmount = baseWetGain * std::min(((delay + bufferIndex) / settings.decay), (float)1.0);
+    // non-linearly increases to 1 as delay approaches gateCutoff
+    const float gateCutoffAmount = baseWetGain * (1 / (settings.gateCutoff - std::min((float)(delay + bufferIndex), (float)(settings.gateCutoff - 1))));
+    const float wetGain = (baseWetGain - decayAmount - gateCutoffAmount) / settings.numOfDelays;
      */
+    const float wetGain = (settings.wetLevel * 0.8) / settings.numOfDelays;
     
     copyToMatrix(currentStepMatrix, delayBufferDataArr, readPosition);
     currentStepMatrixOutput = currentStepMatrix * householderMatrix;
