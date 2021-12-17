@@ -21,6 +21,7 @@ struct Settings {
     float delayLength { 0 };
     float numOfDelays { 0 };
     float decay { 0 };
+    float gateCutoff { 0 };
 };
 
 Settings getSettings(juce::AudioProcessorValueTreeState& apvts);
@@ -35,6 +36,7 @@ const std::string FREEZE_MODE = "Freeze Mode";
 const std::string DELAY_LENGTH = "Delay Length (ms)";
 const std::string NUM_OF_DELAYS = "Number of Delays";
 const std::string DECAY = "Decay (ms)";
+const std::string GATE_CUTOFF = "Gate Cutoff (ms)";
 
 const int MULTICHANNEL_TOTAL_INPUTS = 4;
 const int MATRIX_SIZE = 4;

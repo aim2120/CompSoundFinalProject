@@ -297,9 +297,10 @@ void CompSoundFinalProjectAudioProcessor::addFromDelayBuffer(
                                                              ) {
     //const float wetGain = (settings.wetLevel * 0.8) / settings.numOfDelays;
     const float baseWetGain = (settings.wetLevel * 0.8);
-    float decay = settings.decay;
     float one = 1.0;
-    const float wetGain = (baseWetGain - baseWetGain * std::min((delay / decay), one)) / settings.numOfDelays;
+    const float decayAmount = baseWetGain * std::min((delay / settings.decay), one);
+    const float gateCutoffAmount = baseWetGain * (1 / (settings.gateCutoff - std::max((float)delay, (float)(settings.gateCutoff - 1))));
+    const float wetGain = (baseWetGain - decayAmount - gateCutoffAmount) / settings.numOfDelays;
     
     for (int i = 0; i < MATRIX_SIZE; ++i) {
         for (int j = 0; j < MATRIX_SIZE; ++j) {
@@ -379,6 +380,7 @@ Settings getSettings(juce::AudioProcessorValueTreeState& apvts) {
     settings.delayLength = apvts.getRawParameterValue(DELAY_LENGTH)->load();
     settings.numOfDelays = apvts.getRawParameterValue(NUM_OF_DELAYS)->load();
     settings.decay = apvts.getRawParameterValue(DECAY)->load();
+    settings.gateCutoff = apvts.getRawParameterValue(GATE_CUTOFF)->load();
     
     return settings;
 }
@@ -437,6 +439,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout CompSoundFinalProjectAudioPr
                                                            DECAY,
                                                            juce::NormalisableRange<float>(1.f, 1000.f, 1.f, 1.f),
                                                            500.f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+                                                           GATE_CUTOFF,
+                                                           GATE_CUTOFF,
+                                                           juce::NormalisableRange<float>(1.f, 1000.f, 1.f, 1.f),
+                                                           1000.f));
+    
 
     return layout;
 }
