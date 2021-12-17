@@ -112,7 +112,6 @@ void CompSoundFinalProjectAudioProcessor::prepareToPlay (double sampleRate, int 
     const int numInputChannels = getTotalNumInputChannels();
     const int delayBufferLength = 2 * (samplesPerBlock + sampleRate);
     
-    delayBuffer.setSize(numInputChannels, delayBufferLength);
     multiChannelBuffer.setSize(MULTICHANNEL_TOTAL_INPUTS, samplesPerBlock);
     multiChannelDiffusedBuffer.setSize(MULTICHANNEL_TOTAL_INPUTS, samplesPerBlock);
     multiChannelDelayBuffer.setSize(MULTICHANNEL_TOTAL_INPUTS, delayBufferLength);
@@ -178,7 +177,7 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     auto totalNumOutputChannels = getTotalNumOutputChannels();
     
     const int bufferLength = buffer.getNumSamples();
-    const int delayBufferLength = delayBuffer.getNumSamples();
+    const int delayBufferLength = multiChannelDelayBuffer.getNumSamples();
     
     // In case we have more outputs than inputs, this code clears any output
     // channels that didn't contain input data, (because these aren't
@@ -232,20 +231,6 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
             buffer.addFromWithRamp(originalChannel, 0, bufferData, bufferLength, gainDivisor, gainDivisor);
         }
     }
-    /*
-    float** bufferDataArr = buffer.getArrayOfWritePointers();
-    float** delayBufferDataArr = delayBuffer.getArrayOfWritePointers();
-    
-    for (int i = 1; i <= settings.numOfDelays; ++i) {
-        const int delay = i * settings.delayLength;
-        for (int j = 0; j < bufferLength; ++j) {
-            const int bufferIndex = j;
-            const int readPosition = static_cast<int>((writePosition + (delayBufferLength - (mSampleRate * delay / 1000)) + bufferIndex) % delayBufferLength);
-            addFromDelayBuffer(bufferDataArr, delayBufferDataArr, readPosition, bufferIndex);
-        }
-    }
-     */
-
     
     writePosition += bufferLength;
     writePosition %= delayBufferLength;

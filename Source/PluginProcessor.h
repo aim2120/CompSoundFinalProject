@@ -93,7 +93,6 @@ public:
 
 private:
     // circular buffer variables
-    juce::AudioBuffer<float> delayBuffer;
     juce::AudioBuffer<float> multiChannelBuffer;
     juce::AudioBuffer<float> multiChannelDiffusedBuffer;
     juce::AudioBuffer<float> multiChannelDelayBuffer;
