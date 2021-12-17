@@ -153,6 +153,11 @@ void CompSoundFinalProjectAudioProcessor::prepareToPlay (double sampleRate, int 
     permutationMatrix(1,2) = -1;
     permutationMatrix(2,0) = 1;
     permutationMatrix(3,1) = -1;
+    
+    
+    for (int i = 0; i < MULTICHANNEL_TOTAL_INPUTS; ++i) {
+        diffuseDelays[i] = rand() % 20;
+    }
 }
 
 void CompSoundFinalProjectAudioProcessor::releaseResources()
@@ -221,6 +226,7 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     for (int channel = 0; channel < MULTICHANNEL_TOTAL_INPUTS; ++channel) {
         const float* bufferData = multiChannelBuffer.getReadPointer(channel);
         fillDelayBuffer(multiChannelDelayBuffer, channel, bufferLength, delayBufferLength, bufferData);
+        fillDelayBuffer(multiChannelDiffusedDelayBuffer, channel, bufferLength, delayBufferLength, bufferData);
     }
  
     float** bufferDataArr = multiChannelBuffer.getArrayOfWritePointers();
@@ -229,20 +235,19 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     float** delayBufferDataArr = multiChannelDelayBuffer.getArrayOfWritePointers();
     float** diffusedDelayBufferDataArr = multiChannelDiffusedDelayBuffer.getArrayOfWritePointers();
     
-    const int DIFFUSE_STEPS = 5;
-    
-    for (int i = 0; i < DIFFUSE_STEPS; ++i) {
-        const int delay = 40 * pow(2, i);
-        diffuseBuffer(diffusedBufferDataArr, diffusedBufferHelperDataArr, delayBufferDataArr, bufferLength, delayBufferLength, delay);
+    for (int i = 1; i <= (int)settings.diffusion; ++i) {
+        const int delay = static_cast<int>((20 + i) * pow(1.6, i));
+        diffuseBuffer(diffusedBufferHelperDataArr, delayBufferDataArr, bufferLength, delayBufferLength, delay);
+        
+        const float diffuseGain = 0.9 - (i * 0.1); // decrease with each diffusion step
         
         // add diffuse helper buffer into main diffused buffer
         for (int channel = 0; channel < MULTICHANNEL_TOTAL_INPUTS; ++channel) {
             const float* diffusedBufferHelperData = multiChannelDiffusedBufferHelper.getReadPointer(channel);
-            multiChannelDiffusedBuffer.addFrom(channel, 0, diffusedBufferHelperData, bufferLength);
+            multiChannelDiffusedBuffer.addFromWithRamp(channel, 0, diffusedBufferHelperData, bufferLength, diffuseGain, diffuseGain);
         }
     }
-    
-    multiChannelDiffusedBuffer.applyGain(1 / (float)DIFFUSE_STEPS);
+   
     
     // fill the multichannel diffused delay buffer with the multichannel diffused buffer's data
     for (int channel = 0; channel < MULTICHANNEL_TOTAL_INPUTS; ++channel) {
@@ -252,12 +257,12 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
  
     // add the feedback delay
     const int readPosition = getReadPosition(writePosition, settings.delayLength, 0, delayBufferLength);
-    for (int j = 0; j < bufferLength; ++j) {
-        const int bufferIndex = j;
-        const int readPosition_ = (readPosition + j) % delayBufferLength;
+    for (int i = 0; i < bufferLength; ++i) {
+        const int bufferIndex = i;
+        const int readPosition_ = (readPosition + i) % delayBufferLength;
         addFromDelayBuffer(bufferDataArr, diffusedDelayBufferDataArr, readPosition_, bufferIndex, settings.delayLength);
         
-        const int writePosition_ = (writePosition + j) % delayBufferLength;
+        const int writePosition_ = (writePosition + i) % delayBufferLength;
         feedbackDelay(bufferDataArr, diffusedDelayBufferDataArr, writePosition_, bufferIndex);
     }
     
@@ -336,7 +341,6 @@ void CompSoundFinalProjectAudioProcessor::fillDelayBuffer(
 }
 
 void CompSoundFinalProjectAudioProcessor::diffuseBuffer(
-                                                        float** bufferDataArr,
                                                         float** diffusedBufferDataArr,
                                                         float** delayBufferDataArr,
                                                         const int bufferLength,
@@ -346,22 +350,24 @@ void CompSoundFinalProjectAudioProcessor::diffuseBuffer(
     // use to break delay into evenly divided sections
     const float delaySegment = delay / MULTICHANNEL_TOTAL_INPUTS;
     
-    /*
     // add in evenly-distributed random delay to each channel
+    // diffuse step range = [0, delay)
+    // each channel has a segment of this range
     // _____________________
     // |    |    |    |    | <- a channel's delay falls somewhere in its segment
     // |____|____|____|____|
     //  seg0 seg1 seg2 seg3
+    //  delay increase-->
     for (int i = 0; i < MULTICHANNEL_TOTAL_INPUTS; ++i) {
         const int segment = delaySegment * i;
-        const int randomDelay = segment + rand() % (int)delaySegment;
+        const int randomDelay = segment + diffuseDelays[i];
+        //const int randomDelay = segment + i;
         const int readPosition = getReadPosition(writePosition, randomDelay, 0, delayBufferLength);
         for (int j = 0; j < bufferLength; ++j) {
             const int readPosition_ = (readPosition + j) % delayBufferLength;
             diffusedBufferDataArr[i][j] = delayBufferDataArr[i][readPosition_];
         }
     }
-     */
    
     // mix with permutation matrix
     for (int i = 0; i < bufferLength; ++i) {
@@ -389,7 +395,7 @@ void CompSoundFinalProjectAudioProcessor::addFromDelayBuffer(
    
     copyToMatrix(currentStepMatrix, delayBufferDataArr, readPosition);
     currentStepMatrixOutput = currentStepMatrix * householderMatrix;
-    currentStepMatrixOutput *= 0.9;
+    currentStepMatrixOutput *= 0.8;
     copyFromMatrix(currentStepMatrixOutput, bufferDataArr, bufferIndex);
 }
 
@@ -450,6 +456,7 @@ Settings getSettings(juce::AudioProcessorValueTreeState& apvts) {
     settings.width = apvts.getRawParameterValue(WIDTH)->load();
     settings.freezeMode = apvts.getRawParameterValue(FREEZE_MODE)->load();
     settings.delayLength = apvts.getRawParameterValue(DELAY_LENGTH)->load();
+    settings.diffusion = apvts.getRawParameterValue(DIFFUSION)->load();
     settings.decay = apvts.getRawParameterValue(DECAY)->load();
     settings.gateCutoff = apvts.getRawParameterValue(GATE_CUTOFF)->load();
     
@@ -500,6 +507,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout CompSoundFinalProjectAudioPr
                                                            DELAY_LENGTH,
                                                            juce::NormalisableRange<float>(0.f, 500.f, 1.f, 1.f),
                                                            100.f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+                                                           DIFFUSION,
+                                                           DIFFUSION,
+                                                           juce::NormalisableRange<float>(0.f, 8.f, 1.f, 1.f),
+                                                           4.f));
     layout.add(std::make_unique<juce::AudioParameterFloat>(
                                                            DECAY,
                                                            DECAY,

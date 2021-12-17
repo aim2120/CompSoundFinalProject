@@ -19,6 +19,7 @@ struct Settings {
     float width { 0 };
     float freezeMode { 0 };
     float delayLength { 0 };
+    float diffusion { 0 };
     float decay { 0 };
     float gateCutoff { 0 };
 };
@@ -33,6 +34,7 @@ const std::string DRY_LEVEL = "Dry Level";
 const std::string WIDTH = "Width";
 const std::string FREEZE_MODE = "Freeze Mode";
 const std::string DELAY_LENGTH = "Delay Length (ms)";
+const std::string DIFFUSION = "Diffusion";
 const std::string DECAY = "Decay Rate";
 const std::string GATE_CUTOFF = "Gate Cutoff (ms)";
 
@@ -63,7 +65,7 @@ public:
     void copyFromMatrix(juce::dsp::Matrix<float>& matrix, float** buffer, const int bufferPos);
     int getReadPosition(const int writePosition, const int delay, const int offset, const int delayBufferLength);
     void fillDelayBuffer(juce::AudioBuffer<float>& delayBuffer, int channel, const int bufferLength, const int delayBufferLength, const float* bufferData);
-    void diffuseBuffer(float** bufferDataAr, float** diffusedBufferDataArr, float** delayBufferDataArr, const int bufferLength, const int delayBufferLength, const float delay);
+    void diffuseBuffer(float** diffusedBufferDataArr, float** delayBufferDataArr, const int bufferLength, const int delayBufferLength, const float delay);
     void addFromDelayBuffer(float** bufferDataArr, float** delayBufferDataArr, const int readPosition, const int bufferIndex, const int delay);
     void feedbackDelay(float** bufferDataArr, float** delayBufferDataArr, const int writePosition, const int bufferIndex);
 
@@ -99,6 +101,7 @@ private:
     juce::AudioBuffer<float> multiChannelDiffusedBufferHelper;
     juce::AudioBuffer<float> multiChannelDelayBuffer;
     juce::AudioBuffer<float> multiChannelDiffusedDelayBuffer;
+    std::vector<int> diffuseDelays {MULTICHANNEL_TOTAL_INPUTS};
     int writePosition { 0 };
     int mSampleRate;
     
