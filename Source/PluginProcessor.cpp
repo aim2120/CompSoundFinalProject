@@ -255,27 +255,11 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
  
 
     // add the feedback delay
-    /*
-    for (int i = 1; i <= settings.numOfDelays; ++i) {
-        const float delay = settings.delayLength * i;
-        const int readPosition = getReadPosition(writePosition, delay, 0, delayBufferLength);
-        for (int j = 0; j < bufferLength; ++j) {
-            const int bufferIndex = j;
-            const int readPosition_ = (readPosition + j) % delayBufferLength;
-            //addFromDelayBuffer(bufferDataArr, diffusedDelayBufferDataArr, readPosition_, bufferIndex, delay);
-            addFromDelayBuffer(bufferDataArr, delayBufferDataArr, readPosition_, bufferIndex, delay);
-            
-            const int writePosition_ = (writePosition + j) % delayBufferLength;
-            feedbackDelay(bufferDataArr, delayBufferDataArr, writePosition_);
-        }
-    }
-     */
     const int readPosition = getReadPosition(writePosition, settings.delayLength, 0, delayBufferLength);
     for (int j = 0; j < bufferLength; ++j) {
         const int bufferIndex = j;
         const int readPosition_ = (readPosition + j) % delayBufferLength;
-        //addFromDelayBuffer(bufferDataArr, diffusedDelayBufferDataArr, readPosition_, bufferIndex, delay);
-        addFromDelayBuffer(bufferDataArr, delayBufferDataArr, readPosition_, bufferIndex, settings.delayLength);
+        addFromDelayBuffer(bufferDataArr, diffusedDelayBufferDataArr, readPosition_, bufferIndex, settings.delayLength);
         
         const int writePosition_ = (writePosition + j) % delayBufferLength;
         feedbackDelay(bufferDataArr, delayBufferDataArr, writePosition_, bufferIndex);
@@ -366,6 +350,7 @@ void CompSoundFinalProjectAudioProcessor::diffuseBuffer(
     // use to break delay into evenly divided sections
     const float delaySegment = delay / MULTICHANNEL_TOTAL_INPUTS;
     
+    /*
     // add in evenly-distributed random delay to each channel
     // _____________________
     // |    |    |    |    | <- a channel's delay falls somewhere in its segment
@@ -380,6 +365,7 @@ void CompSoundFinalProjectAudioProcessor::diffuseBuffer(
             diffusedBufferDataArr[i][j] = delayBufferDataArr[i][readPosition_];
         }
     }
+     */
    
     // mix with permutation matrix
     for (int i = 0; i < bufferLength; ++i) {
@@ -410,10 +396,10 @@ void CompSoundFinalProjectAudioProcessor::addFromDelayBuffer(
     const float decayAmount = baseWetGain * std::min(((delay + bufferIndex) / settings.decay), (float)1.0);
     // non-linearly increases to 1 as delay approaches gateCutoff
     const float gateCutoffAmount = baseWetGain * (1 / (settings.gateCutoff - std::min((float)(delay + bufferIndex), (float)(settings.gateCutoff - 1))));
-    const float wetGain = (baseWetGain - decayAmount - gateCutoffAmount) / settings.numOfDelays;
+    const float wetGain = (baseWetGain - decayAmount - gateCutoffAmount);
      */
     
-    //const float wetGain = (settings.wetLevel * 0.8) / settings.numOfDelays;
+    //const float wetGain = (settings.wetLevel * 0.8);
     
     copyToMatrix(currentStepMatrix, delayBufferDataArr, readPosition);
     currentStepMatrixOutput = currentStepMatrix * householderMatrix;
@@ -437,31 +423,6 @@ void CompSoundFinalProjectAudioProcessor::feedbackDelay(
                                                         ) {
     for (int i = 0; i < MULTICHANNEL_TOTAL_INPUTS; ++i) {
         delayBufferDataArr[i][writePosition] += (bufferDataArr[i][bufferIndex] * 0.8);
-    }
-}
-
-void CompSoundFinalProjectAudioProcessor::addFromDelayBuffer(
-                                                             juce::AudioBuffer<float>& buffer,
-                                                             int channel,
-                                                             const int bufferLength,
-                                                             const int delayBufferLength,
-                                                             const float* delayBufferData,
-                                                             const float gainMultiplier
-                                                             ) {
-    buffer.applyGain(channel, 0, bufferLength, (settings.dryLevel * 0.8 * gainMultiplier));
-    
-    for (int i = 1; i < settings.numOfDelays; i++) {
-        const int delay = static_cast<int>(settings.delayLength) * i;
-        int readPosition = static_cast<int>((writePosition + (delayBufferLength - (mSampleRate * (static_cast<int>(settings.delayLength) * i) / 1000))) % delayBufferLength);
-        float gain = (settings.wetLevel * 0.8 * gainMultiplier) / i;
-        
-        if (delayBufferLength > bufferLength + readPosition) {
-            buffer.addFromWithRamp(channel, 0, delayBufferData + readPosition, bufferLength, gain, gain);
-        } else {
-            int bufferRemaining = delayBufferLength - readPosition;
-            buffer.addFromWithRamp(channel, 0, delayBufferData + readPosition, bufferRemaining, gain, gain);
-            buffer.addFromWithRamp(channel, bufferRemaining, delayBufferData, bufferLength - bufferRemaining, gain, gain);
-        }
     }
 }
 
@@ -502,7 +463,6 @@ Settings getSettings(juce::AudioProcessorValueTreeState& apvts) {
     settings.width = apvts.getRawParameterValue(WIDTH)->load();
     settings.freezeMode = apvts.getRawParameterValue(FREEZE_MODE)->load();
     settings.delayLength = apvts.getRawParameterValue(DELAY_LENGTH)->load();
-    settings.numOfDelays = apvts.getRawParameterValue(NUM_OF_DELAYS)->load();
     settings.decay = apvts.getRawParameterValue(DECAY)->load();
     settings.gateCutoff = apvts.getRawParameterValue(GATE_CUTOFF)->load();
     
@@ -553,11 +513,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout CompSoundFinalProjectAudioPr
                                                            DELAY_LENGTH,
                                                            juce::NormalisableRange<float>(0.f, 500.f, 1.f, 1.f),
                                                            100.f));
-    layout.add(std::make_unique<juce::AudioParameterFloat>(
-                                                           NUM_OF_DELAYS,
-                                                           NUM_OF_DELAYS,
-                                                           juce::NormalisableRange<float>(0.f, 10.f, 1.f, 1.f),
-                                                           5.f));
     layout.add(std::make_unique<juce::AudioParameterFloat>(
                                                            DECAY,
                                                            DECAY,

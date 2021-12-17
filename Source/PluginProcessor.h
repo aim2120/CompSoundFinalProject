@@ -19,7 +19,6 @@ struct Settings {
     float width { 0 };
     float freezeMode { 0 };
     float delayLength { 0 };
-    float numOfDelays { 0 };
     float decay { 0 };
     float gateCutoff { 0 };
 };
@@ -34,7 +33,6 @@ const std::string DRY_LEVEL = "Dry Level";
 const std::string WIDTH = "Width";
 const std::string FREEZE_MODE = "Freeze Mode";
 const std::string DELAY_LENGTH = "Delay Length (ms)";
-const std::string NUM_OF_DELAYS = "Number of Delays";
 const std::string DECAY = "Decay (ms)";
 const std::string GATE_CUTOFF = "Gate Cutoff (ms)";
 
@@ -68,7 +66,6 @@ public:
     void diffuseBuffer(float** bufferDataAr, float** diffusedBufferDataArr, float** delayBufferDataArr, const int bufferLength, const int delayBufferLength, const float delay);
     void addFromDelayBuffer(float** bufferDataArr, float** delayBufferDataArr, const int readPosition, const int bufferIndex, const int delay);
     void feedbackDelay(float** bufferDataArr, float** delayBufferDataArr, const int writePosition, const int bufferIndex);
-    void addFromDelayBuffer(juce::AudioBuffer<float>& buffer, int channel, const int bufferLength, const int delayBufferLength, const float* delayBufferData, const float gainMultiplier);
 
     //==============================================================================
     juce::AudioProcessorEditor* createEditor() override;
