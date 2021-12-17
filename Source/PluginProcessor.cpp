@@ -114,7 +114,9 @@ void CompSoundFinalProjectAudioProcessor::prepareToPlay (double sampleRate, int 
     
     multiChannelBuffer.setSize(MULTICHANNEL_TOTAL_INPUTS, samplesPerBlock);
     multiChannelDiffusedBuffer.setSize(MULTICHANNEL_TOTAL_INPUTS, samplesPerBlock);
+    multiChannelDiffusedBufferHelper.setSize(MULTICHANNEL_TOTAL_INPUTS, samplesPerBlock);
     multiChannelDelayBuffer.setSize(MULTICHANNEL_TOTAL_INPUTS, delayBufferLength);
+    multiChannelDiffusedDelayBuffer.setSize(MULTICHANNEL_TOTAL_INPUTS, delayBufferLength);
 
     // setting householder matrix
     for (int i = 0; i < MATRIX_SIZE; i++) {
@@ -124,43 +126,18 @@ void CompSoundFinalProjectAudioProcessor::prepareToPlay (double sampleRate, int 
             } else {
                 householderMatrix(i, j) = -0.5;
             }
-            currentStepMatrix(i, j) = i + j;
         }
     }
     
     // (tediously) setting hadamard matrix
     for (int i = 0; i < MATRIX_SIZE; i++) {
-        hadamardMatrix(0, i) = 1;
-    }
-    for (int i = 0; i < MATRIX_SIZE; i++) {
-        if (i % 2 == 0) {
-            hadamardMatrix(1, i) = 1;
-        } else {
-            hadamardMatrix(1, i) = 1;
-        }
-    }
-    for (int i = 0; i < MATRIX_SIZE; i++) {
-        if (i < MATRIX_SIZE / 2) {
-            hadamardMatrix(2, i) = 1;
-        } else {
-            hadamardMatrix(2, i) = -1;
-        }
-    }
-    for (int i = 0; i < MATRIX_SIZE; i++) {
-        if (i == 0 || i == 3) {
-            hadamardMatrix(3, i) = 1;
-        } else {
-            hadamardMatrix(3, i) = -1;
-        }
-    }
-    
-    currentStepMatrixOutput = currentStepMatrix * householderMatrix;
-    
-    for (int i = 0; i < MATRIX_SIZE; i++) {
         for (int j = 0; j < MATRIX_SIZE; j++) {
-            std::cout << "currentStep: " << currentStepMatrix(i, j) << std::endl;
-            std::cout << "householder: " << householderMatrix(i, j) << std::endl;
-            std::cout << "output: " << currentStepMatrixOutput(i, j) << std::endl;
+            if (i == 0 || j == 0 || (i == 3 && j == 3)
+                || (i == 1 && j == 2) || (i == 2 && j == 1)) {
+                hadamardMatrix(i, j) = 1;
+            } else {
+                hadamardMatrix(i, j) = -1;
+            }
         }
     }
 }
@@ -223,29 +200,54 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
         int originalChannel = channel % totalNumInputChannels;
         const float* bufferData = buffer.getReadPointer(originalChannel);
         multiChannelBuffer.copyFrom(channel, 0, bufferData, bufferLength);
+        multiChannelDiffusedBuffer.copyFrom(channel, 0, bufferData, bufferLength);
+        multiChannelDiffusedBufferHelper.copyFrom(channel, 0, bufferData, bufferLength);
     }
      
+    // apply the dry gain before diffusing or adding in delays
+    multiChannelBuffer.applyGain(settings.dryLevel);
+    
     // fill the multichannel delay buffer with the multichannel buffer's data
     for (int channel = 0; channel < MULTICHANNEL_TOTAL_INPUTS; ++channel) {
         const float* bufferData = multiChannelBuffer.getReadPointer(channel);
         fillDelayBuffer(multiChannelDelayBuffer, channel, bufferLength, delayBufferLength, bufferData);
     }
-   
-    // apply the dry gain before diffusing or adding in delays
-    multiChannelBuffer.applyGain(settings.dryLevel);
-    
+ 
     float** bufferDataArr = multiChannelBuffer.getArrayOfWritePointers();
     float** diffusedBufferDataArr = multiChannelDiffusedBuffer.getArrayOfWritePointers();
+    float** diffusedBufferHelperDataArr = multiChannelDiffusedBufferHelper.getArrayOfWritePointers();
     float** delayBufferDataArr = multiChannelDelayBuffer.getArrayOfWritePointers();
+    float** diffusedDelayBufferDataArr = multiChannelDiffusedDelayBuffer.getArrayOfWritePointers();
     
-    diffuseBuffer(bufferDataArr, diffusedBufferDataArr, bufferLength, 10);
+    const int DIFFUSE_STEPS = 5;
     
+    for (int i = 1; i <= DIFFUSE_STEPS; ++i) {
+        const int delay = i * 20;
+        diffuseBuffer(diffusedBufferDataArr, diffusedBufferHelperDataArr, delayBufferDataArr, bufferLength, delayBufferLength, delay);
+        
+        // add diffuse helper buffer into main diffused buffer
+        for (int channel = 0; channel < MULTICHANNEL_TOTAL_INPUTS; ++channel) {
+            const float* diffusedBufferHelperData = multiChannelDiffusedBufferHelper.getReadPointer(channel);
+            multiChannelDiffusedBuffer.addFrom(channel, 0, diffusedBufferHelperData, bufferLength);
+        }
+    }
+    
+    multiChannelDiffusedBuffer.applyGain(1 / (float)DIFFUSE_STEPS);
+    
+    // fill the multichannel diffused delay buffer with the multichannel diffused buffer's data
+    for (int channel = 0; channel < MULTICHANNEL_TOTAL_INPUTS; ++channel) {
+        const float* bufferData = multiChannelDiffusedBuffer.getReadPointer(channel);
+        fillDelayBuffer(multiChannelDiffusedDelayBuffer, channel, bufferLength, delayBufferLength, bufferData);
+    }
+ 
+
     for (int i = 1; i <= settings.numOfDelays; ++i) {
         const int delay = settings.delayLength * i;
+        int readPosition0 = getReadPosition(writePosition, delay, 0, delayBufferLength);
         for (int j = 0; j < bufferLength; ++j) {
             const int bufferIndex = j;
-            const int readPosition = static_cast<int>((writePosition + (delayBufferLength - (mSampleRate * delay / 1000)) + bufferIndex) % delayBufferLength);
-            addFromDelayBuffer(bufferDataArr, delayBufferDataArr, readPosition, bufferIndex, delay);
+            const int readPosition = (readPosition0 + j) % delayBufferLength;
+            addFromDelayBuffer(bufferDataArr, diffusedDelayBufferDataArr, readPosition, bufferIndex, delay);
         }
     }
     
@@ -253,8 +255,8 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     const float gainDivisor = static_cast<float>(totalNumInputChannels) / static_cast<float>(MULTICHANNEL_TOTAL_INPUTS);
     for (int channel = 0; channel < MULTICHANNEL_TOTAL_INPUTS; ++channel) {
         int originalChannel = channel % totalNumInputChannels;
-        //const float* bufferData = multiChannelBuffer.getReadPointer(channel);
-        const float* bufferData = multiChannelDiffusedBuffer.getReadPointer(channel);
+        const float* bufferData = multiChannelBuffer.getReadPointer(channel);
+        //const float* bufferData = multiChannelDiffusedBuffer.getReadPointer(channel);
         if (channel < totalNumInputChannels) {
             buffer.copyFromWithRamp(originalChannel, 0, bufferData, bufferLength, gainDivisor, gainDivisor);
         } else {
@@ -282,6 +284,11 @@ void CompSoundFinalProjectAudioProcessor::setReverbParameters() {
     reverbParams.freezeMode = settings.freezeMode;
     
     reverb.setParameters(reverbParams);
+}
+
+int CompSoundFinalProjectAudioProcessor::getReadPosition(const int writePosition, const int delay, const int offset, const int delayBufferLength) {
+    const int readPosition = static_cast<int>((writePosition + (delayBufferLength - (mSampleRate * delay / 1000)) + offset) % delayBufferLength);
+    return readPosition;
 }
 
 void CompSoundFinalProjectAudioProcessor::copyToMatrix(juce::dsp::Matrix<float>& matrix, float** buffer, const int bufferPos) {
@@ -320,17 +327,18 @@ void CompSoundFinalProjectAudioProcessor::fillDelayBuffer(
 void CompSoundFinalProjectAudioProcessor::diffuseBuffer(
                                                         float** bufferDataArr,
                                                         float** diffusedBufferDataArr,
+                                                        float** delayBufferDataArr,
                                                         const int bufferLength,
+                                                        const int delayBufferLength,
                                                         const int delay
                                                         ) {
     // add in a random delay to each channel
     for (int i = 0; i < MULTICHANNEL_TOTAL_INPUTS; ++i) {
-        const int randomDelay = rand() % ((i + 1) * delay);
-        for (int j = randomDelay; j < bufferLength; ++j) {
-            diffusedBufferDataArr[i][j] = bufferDataArr[i][j - randomDelay];
-        }
-        for (int j = 0; j < randomDelay; ++j) {
-            diffusedBufferDataArr[i][j] = bufferDataArr[i][bufferLength - (randomDelay + j)];
+        const int randomDelay = delay + rand() % ((i + 1) * delay);
+        int readPosition0 = getReadPosition(writePosition, randomDelay, 0, delayBufferLength);
+        for (int j = 0; j < bufferLength; ++j) {
+            const int readPosition = (readPosition0 + j) % delayBufferLength;
+            diffusedBufferDataArr[i][j] = delayBufferDataArr[i][readPosition];
         }
     }
     
@@ -339,11 +347,14 @@ void CompSoundFinalProjectAudioProcessor::diffuseBuffer(
         const int randomChannel1 = rand() % MULTICHANNEL_TOTAL_INPUTS;
         const int randomChannel2 = rand() % MULTICHANNEL_TOTAL_INPUTS;
         
+        diffusedBufferDataArr[randomChannel1][i] = diffusedBufferDataArr[randomChannel2][i];
+        /*
         if (rand() % 2) {
             diffusedBufferDataArr[randomChannel1][i] = diffusedBufferDataArr[randomChannel2][i];
         } else {
             diffusedBufferDataArr[randomChannel1][i] = -1 * diffusedBufferDataArr[randomChannel2][i];
         }
+         */
     }
     
     // mix with hadamard matrix
@@ -361,33 +372,28 @@ void CompSoundFinalProjectAudioProcessor::addFromDelayBuffer(
                                                              const int bufferIndex,
                                                              const int delay
                                                              ) {
-    //const float wetGain = (settings.wetLevel * 0.8) / settings.numOfDelays;
+    const float wetGain = (settings.wetLevel * 0.8) / settings.numOfDelays;
+    /*
     const float baseWetGain = (settings.wetLevel * 0.8);
     const float decayAmount = baseWetGain * std::min((delay / settings.decay), (float)1.0);
-    const float gateCutoffAmount = baseWetGain * (1 / (settings.gateCutoff - std::max((float)delay, (float)(settings.gateCutoff - 1))));
-    const float wetGain = (baseWetGain - decayAmount - gateCutoffAmount) / settings.numOfDelays;
-    
-    copyToMatrix(currentStepMatrix, delayBufferDataArr, readPosition);
-    /*
-    for (int i = 0; i < MATRIX_SIZE; ++i) {
-        for (int j = 0; j < MATRIX_SIZE; ++j) {
-            currentStepMatrix(i, j) = delayBufferDataArr[j][readPosition];
-        }
-    }
+    const float gateCutoffAmount = baseWetGain * (1 / (settings.gateCutoff - std::min((float)delay, (float)(settings.gateCutoff - 1))));
+    const float wetGain = (baseWetGain - decayAmount - gateCutoffAmount) / (float)settings.numOfDelays;
      */
     
+    copyToMatrix(currentStepMatrix, delayBufferDataArr, readPosition);
     currentStepMatrixOutput = currentStepMatrix * householderMatrix;
+    
+    /*
     currentStepMatrixOutput = currentStepMatrixOutput * wetGain;
     
     copyFromMatrix(currentStepMatrixOutput, bufferDataArr, bufferIndex);
+     */
     
-    /*
     for (int i = 0; i < MATRIX_SIZE; ++i) {
         for (int j = 0; j < MATRIX_SIZE; ++j) {
-            bufferDataArr[j][bufferIndex] += currentStepMatrixOutput(i, j);
+            bufferDataArr[j][bufferIndex] += currentStepMatrixOutput(i, j) * wetGain;
         }
     }
-     */
 }
 
 void CompSoundFinalProjectAudioProcessor::addFromDelayBuffer(
@@ -401,6 +407,7 @@ void CompSoundFinalProjectAudioProcessor::addFromDelayBuffer(
     buffer.applyGain(channel, 0, bufferLength, (settings.dryLevel * 0.8 * gainMultiplier));
     
     for (int i = 1; i < settings.numOfDelays; i++) {
+        const int delay = static_cast<int>(settings.delayLength) * i;
         int readPosition = static_cast<int>((writePosition + (delayBufferLength - (mSampleRate * (static_cast<int>(settings.delayLength) * i) / 1000))) % delayBufferLength);
         float gain = (settings.wetLevel * 0.8 * gainMultiplier) / i;
         
@@ -510,13 +517,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout CompSoundFinalProjectAudioPr
     layout.add(std::make_unique<juce::AudioParameterFloat>(
                                                            DECAY,
                                                            DECAY,
-                                                           juce::NormalisableRange<float>(1.f, 1000.f, 1.f, 1.f),
-                                                           500.f));
+                                                           juce::NormalisableRange<float>(1.f, 5000.f, 1.f, 1.f),
+                                                           5000.f));
     layout.add(std::make_unique<juce::AudioParameterFloat>(
                                                            GATE_CUTOFF,
                                                            GATE_CUTOFF,
-                                                           juce::NormalisableRange<float>(1.f, 1000.f, 1.f, 1.f),
-                                                           1000.f));
+                                                           juce::NormalisableRange<float>(1.f, 5000.f, 1.f, 1.f),
+                                                           5000.f));
     
 
     return layout;
