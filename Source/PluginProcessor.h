@@ -23,7 +23,7 @@ struct Settings {
     float diffusion { 0 };
     float decay { 0 };
     bool freezeMode { false };
-    float gateCutoff { 0 };
+    bool reverse { false };
 };
 
 Settings getSettings(juce::AudioProcessorValueTreeState& apvts);
@@ -36,11 +36,11 @@ const std::string DAMPING_FREQ = "Damping Frequency Cutoff";
 const std::string WET_LEVEL = "Wet Level";
 const std::string DRY_LEVEL = "Dry Level";
 const std::string WIDTH = "Width";
-const std::string FREEZE_MODE = "Freeze Mode";
-const std::string DELAY_LENGTH = "Delay Length (ms)";
+const std::string DELAY_LENGTH = "Pre-Delay (ms)";
 const std::string DIFFUSION = "Diffusion";
 const std::string DECAY = "Decay Rate";
-const std::string GATE_CUTOFF = "Gate Cutoff (ms)";
+const std::string FREEZE_MODE = "Freeze Mode";
+const std::string REVERSE = "Reverse";
 
 const int MULTICHANNEL_TOTAL_INPUTS = 4;
 const int MATRIX_SIZE = 4;

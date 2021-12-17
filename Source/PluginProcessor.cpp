@@ -237,14 +237,17 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
         const float* bufferData = buffer.getReadPointer(originalChannel);
         multiChannelBuffer.copyFrom(channel, 0, bufferData, bufferLength);
         multiChannelDiffusedBuffer.copyFrom(channel, 0, bufferData, bufferLength);
-        multiChannelDiffusedBufferHelper.copyFrom(channel, 0, bufferData, bufferLength);
     }
     
+    if (settings.reverse) {
+        multiChannelBuffer.reverse(0, bufferLength);
+        multiChannelDiffusedBuffer.reverse(0, bufferLength);
+    }
+   
     // fill the multichannel circular delay buffer
     for (int channel = 0; channel < MULTICHANNEL_TOTAL_INPUTS; ++channel) {
         const float* bufferData = multiChannelBuffer.getReadPointer(channel);
         fillDelayBuffer(multiChannelDelayBuffer, channel, bufferLength, delayBufferLength, bufferData);
-        //fillDelayBuffer(multiChannelDiffusedDelayBuffer, channel, bufferLength, delayBufferLength, bufferData);
     }
  
     float** bufferDataArr = multiChannelBuffer.getArrayOfWritePointers();
@@ -310,6 +313,7 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
         buffer.addFromWithRamp(originalChannel, 0, bufferData, bufferLength, gainDivisor, gainDivisor);
     }
     
+    // advance write head
     writePosition += bufferLength;
     writePosition %= delayBufferLength;
         
@@ -435,15 +439,6 @@ void CompSoundFinalProjectAudioProcessor::feedbackDelay(
                                                         const int writePosition,
                                                         const int bufferIndex
                                                         ) {
-    /*
-    // linearly increases to 1 as delay approaches decay
-    const float decayAmount = baseDecay * std::min(((delay + bufferIndex) / settings.decay), (float)1.0);
-    // non-linearly increases to 1 as delay approaches gateCutoff
-    const float gateCutoffAmount = baseDecay * (1 / (settings.gateCutoff - std::min((float)(delay + bufferIndex), (float)(settings.gateCutoff - 1))));
-    const float aggregateDecay = (baseDecay - decayAmount - gateCutoffAmount);
-     */
-    
- 
     for (int i = 0; i < MULTICHANNEL_TOTAL_INPUTS; ++i) {
         delayBufferDataArr[i][writePosition] += (bufferDataArr[i][bufferIndex] * settings.decay);
     }
@@ -490,7 +485,7 @@ Settings getSettings(juce::AudioProcessorValueTreeState& apvts) {
     settings.diffusion = apvts.getRawParameterValue(DIFFUSION)->load();
     settings.decay = apvts.getRawParameterValue(DECAY)->load();
     settings.freezeMode = apvts.getRawParameterValue(FREEZE_MODE)->load();
-    settings.gateCutoff = apvts.getRawParameterValue(GATE_CUTOFF)->load();
+    settings.reverse = apvts.getRawParameterValue(REVERSE)->load();
     
     return settings;
 }
@@ -544,8 +539,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout CompSoundFinalProjectAudioPr
     layout.add(std::make_unique<juce::AudioParameterFloat>(
                                                            DELAY_LENGTH,
                                                            DELAY_LENGTH,
-                                                           juce::NormalisableRange<float>(0.f, 500.f, 1.f, 1.f),
-                                                           100.f));
+                                                           juce::NormalisableRange<float>(0.f, 500.f, 0.1f, 0.5f),
+                                                           30.f));
     layout.add(std::make_unique<juce::AudioParameterFloat>(
                                                            DIFFUSION,
                                                            DIFFUSION,
@@ -560,12 +555,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout CompSoundFinalProjectAudioPr
                                                           FREEZE_MODE,
                                                           FREEZE_MODE,
                                                           false));
-    layout.add(std::make_unique<juce::AudioParameterFloat>(
-                                                           GATE_CUTOFF,
-                                                           GATE_CUTOFF,
-                                                           juce::NormalisableRange<float>(1.f, 5000.f, 1.f, 1.f),
-                                                           5000.f));
-    
+    layout.add(std::make_unique<juce::AudioParameterBool>(
+                                                          REVERSE,
+                                                          REVERSE,
+                                                          true));
 
     return layout;
 }
