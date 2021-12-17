@@ -61,7 +61,8 @@ public:
 
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
     void setReverbParameters();
-    void fillDelayBuffer(int channel, const int bufferLength, const int delayBufferLength, const float* bufferData);
+    void fillDelayBuffer(juce::AudioBuffer<float>& delayBuffer, int channel, const int bufferLength, const int delayBufferLength, const float* bufferData);
+    void diffuseDelayBuffer(float** delayBufferDataAr, float** diffusedDelayBufferDataArr);
     void addFromDelayBuffer(juce::AudioBuffer<float>& buffer, int channel, const int bufferLength, const int delayBufferLength, const float* delayBufferData, const float gainMultiplier);
     void addFromDelayBuffer(float** bufferDataArr, float** delayBufferDataArr, const int readPosition, const int bufferIndex, const int delay);
 

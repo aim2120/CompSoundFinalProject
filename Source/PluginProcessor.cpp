@@ -191,23 +191,20 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     
     settings = getSettings(apvts);
     setReverbParameters();
-    
-    // fill the delay buffer with the current buffer's data
-    for (int channel = 0; channel < totalNumInputChannels; ++channel) {
-        const float* bufferData = buffer.getReadPointer(channel);
-        fillDelayBuffer(channel, bufferLength, delayBufferLength, bufferData);
-    }
-   
-    
-    // convert the buffer and delay buffer to multiChannel
+  
+    // convert the buffer buffer to multiChannel
     for (int channel = 0; channel < MULTICHANNEL_TOTAL_INPUTS; ++channel) {
         int originalChannel = channel % totalNumInputChannels;
         const float* bufferData = buffer.getReadPointer(originalChannel);
-        const float* delayBufferData = delayBuffer.getReadPointer(originalChannel);
         multiChannelBuffer.copyFrom(channel, 0, bufferData, bufferLength);
-        multiChannelDelayBuffer.copyFrom(channel, 0, delayBufferData, delayBufferLength);
     }
-    
+     
+    // fill the multichannel delay buffer with the multichannel buffer's data
+    for (int channel = 0; channel < MULTICHANNEL_TOTAL_INPUTS; ++channel) {
+        const float* bufferData = multiChannelBuffer.getReadPointer(channel);
+        fillDelayBuffer(multiChannelDelayBuffer, channel, bufferLength, delayBufferLength, bufferData);
+    }
+   
     // apply the dry gain before diffusing or adding in delays
     multiChannelBuffer.applyGain(settings.dryLevel);
     
@@ -274,6 +271,7 @@ void CompSoundFinalProjectAudioProcessor::setReverbParameters() {
 }
 
 void CompSoundFinalProjectAudioProcessor::fillDelayBuffer(
+                                                          juce::AudioBuffer<float>& delayBuffer,
                                                           int channel,
                                                           const int bufferLength,
                                                           const int delayBufferLength,
@@ -288,6 +286,13 @@ void CompSoundFinalProjectAudioProcessor::fillDelayBuffer(
     }
 }
 
+void CompSoundFinalProjectAudioProcessor::diffuseDelayBuffer(
+                                                             float** delayBufferDataArr,
+                                                             float** diffusedDelayBufferDataArr
+                                                             ) {
+    
+};
+
 void CompSoundFinalProjectAudioProcessor::addFromDelayBuffer(
                                                              float** bufferDataArr,
                                                              float** delayBufferDataArr,
@@ -297,11 +302,11 @@ void CompSoundFinalProjectAudioProcessor::addFromDelayBuffer(
                                                              ) {
     //const float wetGain = (settings.wetLevel * 0.8) / settings.numOfDelays;
     const float baseWetGain = (settings.wetLevel * 0.8);
-    float one = 1.0;
-    const float decayAmount = baseWetGain * std::min((delay / settings.decay), one);
+    const float decayAmount = baseWetGain * std::min((delay / settings.decay), (float)1.0);
     const float gateCutoffAmount = baseWetGain * (1 / (settings.gateCutoff - std::max((float)delay, (float)(settings.gateCutoff - 1))));
     const float wetGain = (baseWetGain - decayAmount - gateCutoffAmount) / settings.numOfDelays;
     
+   
     for (int i = 0; i < MATRIX_SIZE; ++i) {
         for (int j = 0; j < MATRIX_SIZE; ++j) {
             currentStepMatrix(i, j) = delayBufferDataArr[j][readPosition];
