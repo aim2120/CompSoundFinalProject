@@ -253,7 +253,6 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
         fillDelayBuffer(multiChannelDiffusedDelayBuffer, channel, bufferLength, delayBufferLength, bufferData);
     }
  
-
     // add the feedback delay
     const int readPosition = getReadPosition(writePosition, settings.delayLength, 0, delayBufferLength);
     for (int j = 0; j < bufferLength; ++j) {
@@ -262,7 +261,7 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
         addFromDelayBuffer(bufferDataArr, diffusedDelayBufferDataArr, readPosition_, bufferIndex, settings.delayLength);
         
         const int writePosition_ = (writePosition + j) % delayBufferLength;
-        feedbackDelay(bufferDataArr, delayBufferDataArr, writePosition_, bufferIndex);
+        feedbackDelay(bufferDataArr, diffusedDelayBufferDataArr, writePosition_, bufferIndex);
     }
     
     
