@@ -220,7 +220,7 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
         for (int j = 0; j < bufferLength; ++j) {
             const int bufferIndex = j;
             const int readPosition = static_cast<int>((writePosition + (delayBufferLength - (mSampleRate * delay / 1000)) + bufferIndex) % delayBufferLength);
-            addFromDelayBuffer(bufferDataArr, delayBufferDataArr, readPosition, bufferIndex);
+            addFromDelayBuffer(bufferDataArr, delayBufferDataArr, readPosition, bufferIndex, delay);
         }
     }
     
@@ -292,9 +292,14 @@ void CompSoundFinalProjectAudioProcessor::addFromDelayBuffer(
                                                              float** bufferDataArr,
                                                              float** delayBufferDataArr,
                                                              const int readPosition,
-                                                             const int bufferIndex
+                                                             const int bufferIndex,
+                                                             const int delay
                                                              ) {
-    const float wetGain = settings.wetLevel * 0.8;
+    //const float wetGain = (settings.wetLevel * 0.8) / settings.numOfDelays;
+    const float baseWetGain = (settings.wetLevel * 0.8);
+    float decay = settings.decay;
+    float one = 1.0;
+    const float wetGain = (baseWetGain - baseWetGain * std::min((delay / decay), one)) / settings.numOfDelays;
     
     for (int i = 0; i < MATRIX_SIZE; ++i) {
         for (int j = 0; j < MATRIX_SIZE; ++j) {
@@ -306,7 +311,7 @@ void CompSoundFinalProjectAudioProcessor::addFromDelayBuffer(
     
     for (int i = 0; i < MATRIX_SIZE; ++i) {
         for (int j = 0; j < MATRIX_SIZE; ++j) {
-            bufferDataArr[j][bufferIndex] += (currentStepMatrixOutput(i, j) * (wetGain / settings.numOfDelays));
+            bufferDataArr[j][bufferIndex] += (currentStepMatrixOutput(i, j) * wetGain);
         }
     }
 }
@@ -373,6 +378,7 @@ Settings getSettings(juce::AudioProcessorValueTreeState& apvts) {
     settings.freezeMode = apvts.getRawParameterValue(FREEZE_MODE)->load();
     settings.delayLength = apvts.getRawParameterValue(DELAY_LENGTH)->load();
     settings.numOfDelays = apvts.getRawParameterValue(NUM_OF_DELAYS)->load();
+    settings.decay = apvts.getRawParameterValue(DECAY)->load();
     
     return settings;
 }
@@ -426,7 +432,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout CompSoundFinalProjectAudioPr
                                                            NUM_OF_DELAYS,
                                                            juce::NormalisableRange<float>(0.f, 10.f, 1.f, 1.f),
                                                            5.f));
-
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+                                                           DECAY,
+                                                           DECAY,
+                                                           juce::NormalisableRange<float>(1.f, 1000.f, 1.f, 1.f),
+                                                           500.f));
 
     return layout;
 }

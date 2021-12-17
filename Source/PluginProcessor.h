@@ -20,6 +20,7 @@ struct Settings {
     float freezeMode { 0 };
     float delayLength { 0 };
     float numOfDelays { 0 };
+    float decay { 0 };
 };
 
 Settings getSettings(juce::AudioProcessorValueTreeState& apvts);
@@ -33,6 +34,7 @@ const std::string WIDTH = "Width";
 const std::string FREEZE_MODE = "Freeze Mode";
 const std::string DELAY_LENGTH = "Delay Length (ms)";
 const std::string NUM_OF_DELAYS = "Number of Delays";
+const std::string DECAY = "Decay (ms)";
 
 const int MULTICHANNEL_TOTAL_INPUTS = 4;
 const int MATRIX_SIZE = 4;
@@ -59,7 +61,7 @@ public:
     void setReverbParameters();
     void fillDelayBuffer(int channel, const int bufferLength, const int delayBufferLength, const float* bufferData);
     void addFromDelayBuffer(juce::AudioBuffer<float>& buffer, int channel, const int bufferLength, const int delayBufferLength, const float* delayBufferData, const float gainMultiplier);
-    void addFromDelayBuffer(float** bufferDataArr, float** delayBufferDataArr, const int readPosition, const int bufferIndex);
+    void addFromDelayBuffer(float** bufferDataArr, float** delayBufferDataArr, const int readPosition, const int bufferIndex, const int delay);
 
     //==============================================================================
     juce::AudioProcessorEditor* createEditor() override;
