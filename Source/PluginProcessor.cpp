@@ -211,6 +211,8 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     float** diffusedBufferDataArr = multiChannelDiffusedBuffer.getArrayOfWritePointers();
     float** delayBufferDataArr = multiChannelDelayBuffer.getArrayOfWritePointers();
     
+    diffuseBuffer(bufferDataArr, diffusedBufferDataArr, bufferLength);
+    
     for (int i = 1; i <= settings.numOfDelays; ++i) {
         const int delay = settings.delayLength * i;
         for (int j = 0; j < bufferLength; ++j) {
@@ -224,7 +226,8 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     const float gainDivisor = static_cast<float>(totalNumInputChannels) / static_cast<float>(MULTICHANNEL_TOTAL_INPUTS);
     for (int channel = 0; channel < MULTICHANNEL_TOTAL_INPUTS; ++channel) {
         int originalChannel = channel % totalNumInputChannels;
-        const float* bufferData = multiChannelBuffer.getReadPointer(channel);
+        //const float* bufferData = multiChannelBuffer.getReadPointer(channel);
+        const float* bufferData = multiChannelDiffusedBuffer.getReadPointer(channel);
         if (channel < totalNumInputChannels) {
             buffer.copyFromWithRamp(originalChannel, 0, bufferData, bufferLength, gainDivisor, gainDivisor);
         } else {
@@ -271,11 +274,21 @@ void CompSoundFinalProjectAudioProcessor::fillDelayBuffer(
     }
 }
 
-void CompSoundFinalProjectAudioProcessor::diffuseDelayBuffer(
-                                                             float** delayBufferDataArr,
-                                                             float** diffusedDelayBufferDataArr
+void CompSoundFinalProjectAudioProcessor::diffuseBuffer(
+                                                             float** bufferDataArr,
+                                                             float** diffusedBufferDataArr,
+                                                             const int bufferLength
                                                              ) {
-    
+    // add in a random delay to each channel
+    for (int i = 0; i < MULTICHANNEL_TOTAL_INPUTS; ++i) {
+        const int randomDelay = rand() % 50;
+        for (int j = randomDelay; j < bufferLength; ++j) {
+            diffusedBufferDataArr[i][j] = bufferDataArr[i][j - randomDelay];
+        }
+        for (int j = 0; j < randomDelay; ++j) {
+            diffusedBufferDataArr[i][j] = bufferDataArr[i][bufferLength - (randomDelay + j)];
+        }
+    }
 };
 
 void CompSoundFinalProjectAudioProcessor::addFromDelayBuffer(
