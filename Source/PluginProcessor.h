@@ -11,24 +11,28 @@
 #include <JuceHeader.h>
 
 struct Settings {
+    int mode { 0 };
     float gain { 0 };
     float roomSize { 0 };
     float damping { 0 };
+    float dampingFreq { 0 };
     float wetLevel { 0 };
     float dryLevel { 0 };
     float width { 0 };
-    float freezeMode { 0 };
     float delayLength { 0 };
     float diffusion { 0 };
     float decay { 0 };
+    bool freezeMode { false };
     float gateCutoff { 0 };
 };
 
 Settings getSettings(juce::AudioProcessorValueTreeState& apvts);
 
+const std::string MODE = "Mode";
 const std::string GAIN = "Gain";
 const std::string ROOM_SIZE = "Room Size";
 const std::string DAMPING = "Damping";
+const std::string DAMPING_FREQ = "Damping Frequency Cutoff";
 const std::string WET_LEVEL = "Wet Level";
 const std::string DRY_LEVEL = "Dry Level";
 const std::string WIDTH = "Width";
@@ -40,6 +44,11 @@ const std::string GATE_CUTOFF = "Gate Cutoff (ms)";
 
 const int MULTICHANNEL_TOTAL_INPUTS = 4;
 const int MATRIX_SIZE = 4;
+
+const juce::String modes[] {
+    "Basic Reverb",
+    "My Reverb"
+};
 
 //==============================================================================
 /**
@@ -99,6 +108,7 @@ private:
     juce::AudioBuffer<float> multiChannelBuffer;
     juce::AudioBuffer<float> multiChannelDiffusedBuffer;
     juce::AudioBuffer<float> multiChannelDiffusedBufferHelper;
+    juce::AudioBuffer<float> multiChannelDiffusedBufferLowPass;
     juce::AudioBuffer<float> multiChannelDelayBuffer;
     juce::AudioBuffer<float> multiChannelDiffusedDelayBuffer;
     std::vector<int> diffuseDelays {MULTICHANNEL_TOTAL_INPUTS};
@@ -120,6 +130,10 @@ private:
     juce::dsp::Matrix<float> permutationMatrix { juce::dsp::Matrix<float>(MATRIX_SIZE, MATRIX_SIZE) };
     juce::dsp::Matrix<float> currentStepMatrix { juce::dsp::Matrix<float>(MATRIX_SIZE, MATRIX_SIZE) };
     juce::dsp::Matrix<float> currentStepMatrixOutput { juce::dsp::Matrix<float>(MATRIX_SIZE, MATRIX_SIZE) };
+    
+    
+    // reverb effect variables
+    juce::IIRFilter lowPassFilters[MULTICHANNEL_TOTAL_INPUTS];
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CompSoundFinalProjectAudioProcessor)
 };
