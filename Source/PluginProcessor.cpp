@@ -216,9 +216,6 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
         multiChannelDiffusedBuffer.copyFrom(channel, 0, bufferData, bufferLength);
         multiChannelDiffusedBufferHelper.copyFrom(channel, 0, bufferData, bufferLength);
     }
-     
-    // apply the dry gain before diffusing or adding in delays
-    multiChannelBuffer.applyGain(settings.dryLevel);
     
     // fill the multichannel delay buffer with the multichannel buffer's data
     for (int channel = 0; channel < MULTICHANNEL_TOTAL_INPUTS; ++channel) {
@@ -265,17 +262,17 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     }
     
     
-    // condense the multiChannel buffer data back into the original buffer
+    // apply dry and wet gain individually
+    buffer.applyGain(settings.dryLevel);
+    multiChannelBuffer.applyGain(settings.wetLevel * 0.8);
+    
+    // condense the multiChannel buffer and add to original buffer
     const float gainDivisor = static_cast<float>(totalNumInputChannels) / static_cast<float>(MULTICHANNEL_TOTAL_INPUTS);
     for (int channel = 0; channel < MULTICHANNEL_TOTAL_INPUTS; ++channel) {
         int originalChannel = channel % totalNumInputChannels;
         const float* bufferData = multiChannelBuffer.getReadPointer(channel);
         //const float* bufferData = multiChannelDiffusedBuffer.getReadPointer(channel);
-        if (channel < totalNumInputChannels) {
-            buffer.copyFromWithRamp(originalChannel, 0, bufferData, bufferLength, gainDivisor, gainDivisor);
-        } else {
-            buffer.addFromWithRamp(originalChannel, 0, bufferData, bufferLength, gainDivisor, gainDivisor);
-        }
+        buffer.addFromWithRamp(originalChannel, 0, bufferData, bufferLength, gainDivisor, gainDivisor);
     }
     
     writePosition += bufferLength;
@@ -389,29 +386,11 @@ void CompSoundFinalProjectAudioProcessor::addFromDelayBuffer(
                                                              const int bufferIndex,
                                                              const int delay
                                                              ) {
-    /*
-    const float baseWetGain = (settings.wetLevel * 0.8);
-    // linearly increases to 1 as delay approaches decay
-    const float decayAmount = baseWetGain * std::min(((delay + bufferIndex) / settings.decay), (float)1.0);
-    // non-linearly increases to 1 as delay approaches gateCutoff
-    const float gateCutoffAmount = baseWetGain * (1 / (settings.gateCutoff - std::min((float)(delay + bufferIndex), (float)(settings.gateCutoff - 1))));
-    const float wetGain = (baseWetGain - decayAmount - gateCutoffAmount);
-     */
-    
-    //const float wetGain = (settings.wetLevel * 0.8);
-    
+   
     copyToMatrix(currentStepMatrix, delayBufferDataArr, readPosition);
     currentStepMatrixOutput = currentStepMatrix * householderMatrix;
-    currentStepMatrixOutput *= settings.wetLevel;
+    currentStepMatrixOutput *= 0.9;
     copyFromMatrix(currentStepMatrixOutput, bufferDataArr, bufferIndex);
-    
-    /*
-    for (int i = 0; i < MATRIX_SIZE; ++i) {
-        for (int j = 0; j < MATRIX_SIZE; ++j) {
-            bufferDataArr[j][bufferIndex] = currentStepMatrixOutput(i, j) * wetGain;
-        }
-    }
-     */
 }
 
 void CompSoundFinalProjectAudioProcessor::feedbackDelay(
@@ -420,8 +399,17 @@ void CompSoundFinalProjectAudioProcessor::feedbackDelay(
                                                         const int writePosition,
                                                         const int bufferIndex
                                                         ) {
+    /*
+    // linearly increases to 1 as delay approaches decay
+    const float decayAmount = baseDecay * std::min(((delay + bufferIndex) / settings.decay), (float)1.0);
+    // non-linearly increases to 1 as delay approaches gateCutoff
+    const float gateCutoffAmount = baseDecay * (1 / (settings.gateCutoff - std::min((float)(delay + bufferIndex), (float)(settings.gateCutoff - 1))));
+    const float aggregateDecay = (baseDecay - decayAmount - gateCutoffAmount);
+     */
+    
+ 
     for (int i = 0; i < MULTICHANNEL_TOTAL_INPUTS; ++i) {
-        delayBufferDataArr[i][writePosition] += (bufferDataArr[i][bufferIndex] * 0.8);
+        delayBufferDataArr[i][writePosition] += (bufferDataArr[i][bufferIndex] * settings.decay);
     }
 }
 
@@ -515,8 +503,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout CompSoundFinalProjectAudioPr
     layout.add(std::make_unique<juce::AudioParameterFloat>(
                                                            DECAY,
                                                            DECAY,
-                                                           juce::NormalisableRange<float>(1.f, 5000.f, 1.f, 1.f),
-                                                           5000.f));
+                                                           juce::NormalisableRange<float>(0.f, 1.f, 0.01f, 1.f),
+                                                           0.8f));
     layout.add(std::make_unique<juce::AudioParameterFloat>(
                                                            GATE_CUTOFF,
                                                            GATE_CUTOFF,

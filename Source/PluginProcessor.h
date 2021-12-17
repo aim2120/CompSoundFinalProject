@@ -33,7 +33,7 @@ const std::string DRY_LEVEL = "Dry Level";
 const std::string WIDTH = "Width";
 const std::string FREEZE_MODE = "Freeze Mode";
 const std::string DELAY_LENGTH = "Delay Length (ms)";
-const std::string DECAY = "Decay (ms)";
+const std::string DECAY = "Decay Rate";
 const std::string GATE_CUTOFF = "Gate Cutoff (ms)";
 
 const int MULTICHANNEL_TOTAL_INPUTS = 4;
