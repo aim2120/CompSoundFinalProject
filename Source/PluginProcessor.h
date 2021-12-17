@@ -65,9 +65,10 @@ public:
     void copyFromMatrix(juce::dsp::Matrix<float>& matrix, float** buffer, const int bufferPos);
     int getReadPosition(const int writePosition, const int delay, const int offset, const int delayBufferLength);
     void fillDelayBuffer(juce::AudioBuffer<float>& delayBuffer, int channel, const int bufferLength, const int delayBufferLength, const float* bufferData);
-    void diffuseBuffer(float** bufferDataAr, float** diffusedBufferDataArr, float** delayBufferDataArr, const int bufferLength, const int delayBufferLength, const int delay);
-    void addFromDelayBuffer(juce::AudioBuffer<float>& buffer, int channel, const int bufferLength, const int delayBufferLength, const float* delayBufferData, const float gainMultiplier);
+    void diffuseBuffer(float** bufferDataAr, float** diffusedBufferDataArr, float** delayBufferDataArr, const int bufferLength, const int delayBufferLength, const float delay);
     void addFromDelayBuffer(float** bufferDataArr, float** delayBufferDataArr, const int readPosition, const int bufferIndex, const int delay);
+    void feedbackDelay(float** bufferDataArr, float** delayBufferDataArr, const int writePosition, const int bufferIndex);
+    void addFromDelayBuffer(juce::AudioBuffer<float>& buffer, int channel, const int bufferLength, const int delayBufferLength, const float* delayBufferData, const float gainMultiplier);
 
     //==============================================================================
     juce::AudioProcessorEditor* createEditor() override;
