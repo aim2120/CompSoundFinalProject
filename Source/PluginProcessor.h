@@ -61,8 +61,10 @@ public:
 
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
     void setReverbParameters();
+    void copyToMatrix(juce::dsp::Matrix<float>& matrix, float** buffer, const int bufferPos);
+    void copyFromMatrix(juce::dsp::Matrix<float>& matrix, float** buffer, const int bufferPos);
     void fillDelayBuffer(juce::AudioBuffer<float>& delayBuffer, int channel, const int bufferLength, const int delayBufferLength, const float* bufferData);
-    void diffuseBuffer(float** bufferDataAr, float** diffusedBufferDataArr, const int bufferLength);
+    void diffuseBuffer(float** bufferDataAr, float** diffusedBufferDataArr, const int bufferLength, const int delay);
     void addFromDelayBuffer(juce::AudioBuffer<float>& buffer, int channel, const int bufferLength, const int delayBufferLength, const float* delayBufferData, const float gainMultiplier);
     void addFromDelayBuffer(float** bufferDataArr, float** delayBufferDataArr, const int readPosition, const int bufferIndex, const int delay);
 
@@ -110,6 +112,7 @@ private:
     
     // diffuser variables
     juce::dsp::Matrix<float> householderMatrix { juce::dsp::Matrix<float>(MATRIX_SIZE, MATRIX_SIZE) };
+    juce::dsp::Matrix<float> hadamardMatrix { juce::dsp::Matrix<float>(MATRIX_SIZE, MATRIX_SIZE) };
     juce::dsp::Matrix<float> currentStepMatrix { juce::dsp::Matrix<float>(MATRIX_SIZE, MATRIX_SIZE) };
     juce::dsp::Matrix<float> currentStepMatrixOutput { juce::dsp::Matrix<float>(MATRIX_SIZE, MATRIX_SIZE) };
     
