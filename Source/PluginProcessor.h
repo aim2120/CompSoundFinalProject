@@ -13,16 +13,17 @@
 struct Settings {
     int mode { 0 };
     float gain { 0 };
-    float roomSize { 0 };
-    float damping { 0 };
-    float dampingFreq { 0 };
     float wetLevel { 0 };
     float dryLevel { 0 };
-    float width { 0 };
     float delayLength { 0 };
+    float earlyReflections { 0 };
     float diffusion { 0 };
     float decay { 0 };
     bool freezeMode { false };
+    float damping { 0 };
+    float dampingFreq { 0 };
+    float roomSize { 0 };
+    float width { 0 };
     bool reverse { false };
 };
 
@@ -30,16 +31,17 @@ Settings getSettings(juce::AudioProcessorValueTreeState& apvts);
 
 const std::string MODE = "Mode";
 const std::string GAIN = "Gain";
-const std::string ROOM_SIZE = "Room Size";
-const std::string DAMPING = "Damping";
-const std::string DAMPING_FREQ = "Damping Frequency Cutoff";
 const std::string WET_LEVEL = "Wet Level";
 const std::string DRY_LEVEL = "Dry Level";
-const std::string WIDTH = "Width";
 const std::string DELAY_LENGTH = "Pre-Delay (ms)";
+const std::string EARLY_REFLECTION = "Early Reflections";
 const std::string DIFFUSION = "Diffusion";
 const std::string DECAY = "Decay Rate";
 const std::string FREEZE_MODE = "Freeze Mode";
+const std::string DAMPING = "Damping";
+const std::string DAMPING_FREQ = "Damping Frequency Cutoff";
+const std::string ROOM_SIZE = "Room Size";
+const std::string WIDTH = "Width";
 const std::string REVERSE = "Reverse";
 
 const int MULTICHANNEL_TOTAL_INPUTS = 4;

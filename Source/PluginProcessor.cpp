@@ -111,7 +111,8 @@ void CompSoundFinalProjectAudioProcessor::prepareToPlay (double sampleRate, int 
     settings = getSettings(apvts);
     setReverbParameters();
    
-    const int delayBufferLength = 3 * (samplesPerBlock + sampleRate);
+    // 1 sec delay buffer
+    const int delayBufferLength = samplesPerBlock + sampleRate;
     
     multiChannelBuffer.setSize(MULTICHANNEL_TOTAL_INPUTS, samplesPerBlock);
     multiChannelDiffusedBuffer.setSize(MULTICHANNEL_TOTAL_INPUTS, samplesPerBlock);
@@ -143,12 +144,12 @@ void CompSoundFinalProjectAudioProcessor::prepareToPlay (double sampleRate, int 
         }
     }
     
+    // setting permutation matrix
     for (int i = 0; i < MATRIX_SIZE; i++) {
         for (int j = 0; j < MATRIX_SIZE; j++) {
             permutationMatrix(i, j) = 0;
         }
     }
-    
     // statically setting for now
     permutationMatrix(0,3) = 1;
     permutationMatrix(1,2) = -1;
@@ -156,10 +157,12 @@ void CompSoundFinalProjectAudioProcessor::prepareToPlay (double sampleRate, int 
     permutationMatrix(3,1) = -1;
     
     
+    // random delays for diffusion steps
     for (int i = 0; i < MULTICHANNEL_TOTAL_INPUTS; ++i) {
         diffuseDelays[i] = rand() % 20;
     }
     
+    // setting lowpass filter
     for (int channel = 0; channel < MULTICHANNEL_TOTAL_INPUTS; ++channel) {
         lowPassFilters[channel].setCoefficients(juce::IIRCoefficients::makeLowPass(sampleRate, settings.dampingFreq));
     }
@@ -218,9 +221,7 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     settings = getSettings(apvts);
     setReverbParameters();
     
-    /*
     if (settings.mode == 0) {
-        
         auto audioBlock = juce::dsp::AudioBlock<float>(buffer);
         auto processContext = juce::dsp::ProcessContextReplacing<float>(audioBlock);
         reverb.setParameters(reverbParams);
@@ -229,7 +230,6 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
         
         return;
     }
-     */
 
     // convert the buffer buffer to multichannel
     for (int channel = 0; channel < MULTICHANNEL_TOTAL_INPUTS; ++channel) {
@@ -290,10 +290,12 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     }
  
     // add the feedback delay
-    const int readPosition = getReadPosition(writePosition, settings.delayLength, 0, delayBufferLength);
+    int delay = settings.delayLength;
+    const int readPosition = getReadPosition(writePosition, delay, 0, delayBufferLength);
     for (int i = 0; i < bufferLength; ++i) {
-        const int bufferIndex = i;
-        const int readPosition_ = (readPosition + i) % delayBufferLength;
+        int bufferIndex = i;
+       
+        const int readPosition_ = (readPosition + bufferIndex) % delayBufferLength;
         addFromDelayBuffer(bufferDataArr, diffusedDelayBufferDataArr, readPosition_, bufferIndex, settings.delayLength);
         
         const int writePosition_ = (writePosition + i) % delayBufferLength;
@@ -309,8 +311,10 @@ void CompSoundFinalProjectAudioProcessor::processBlock (juce::AudioBuffer<float>
     for (int channel = 0; channel < MULTICHANNEL_TOTAL_INPUTS; ++channel) {
         int originalChannel = channel % totalNumInputChannels;
         const float* bufferData = multiChannelBuffer.getReadPointer(channel);
-        //const float* bufferData = multiChannelDiffusedBuffer.getReadPointer(channel);
         buffer.addFromWithRamp(originalChannel, 0, bufferData, bufferLength, gainDivisor, gainDivisor);
+        
+        const float* diffusedBufferData = multiChannelDiffusedBuffer.getReadPointer(channel);
+        buffer.addFromWithRamp(originalChannel, 0, diffusedBufferData, bufferLength, settings.earlyReflections, settings.earlyReflections);
     }
     
     // advance write head
@@ -394,8 +398,9 @@ void CompSoundFinalProjectAudioProcessor::diffuseBuffer(
     //  delay increase-->
     for (int i = 0; i < MULTICHANNEL_TOTAL_INPUTS; ++i) {
         const int segment = delaySegment * i;
+        // using fixed random delays
+        // had tried using rand() here but got clicks :(
         const int randomDelay = segment + diffuseDelays[i];
-        //const int randomDelay = segment + i;
         const int readPosition = getReadPosition(writePosition, randomDelay, 0, delayBufferLength);
         for (int j = 0; j < bufferLength; ++j) {
             const int readPosition_ = (readPosition + j) % delayBufferLength;
@@ -439,8 +444,15 @@ void CompSoundFinalProjectAudioProcessor::feedbackDelay(
                                                         const int writePosition,
                                                         const int bufferIndex
                                                         ) {
+    int decay;
+    if (settings.freezeMode) {
+        decay = 1.0;
+    } else {
+        decay = settings.decay;
+    }
+    
     for (int i = 0; i < MULTICHANNEL_TOTAL_INPUTS; ++i) {
-        delayBufferDataArr[i][writePosition] += (bufferDataArr[i][bufferIndex] * settings.decay);
+        delayBufferDataArr[i][writePosition] += (bufferDataArr[i][bufferIndex] * decay);
     }
 }
 
@@ -475,16 +487,17 @@ Settings getSettings(juce::AudioProcessorValueTreeState& apvts) {
     
     settings.mode = apvts.getRawParameterValue(MODE)->load();
     settings.gain = apvts.getRawParameterValue(GAIN)->load();
-    settings.roomSize = apvts.getRawParameterValue(GAIN)->load();
-    settings.damping = apvts.getRawParameterValue(DAMPING)->load();
-    settings.dampingFreq = apvts.getRawParameterValue(DAMPING_FREQ)->load();
     settings.wetLevel = apvts.getRawParameterValue(WET_LEVEL)->load();
     settings.dryLevel = apvts.getRawParameterValue(DRY_LEVEL)->load();
-    settings.width = apvts.getRawParameterValue(WIDTH)->load();
     settings.delayLength = apvts.getRawParameterValue(DELAY_LENGTH)->load();
+    settings.earlyReflections = apvts.getRawParameterValue(EARLY_REFLECTION)->load();
     settings.diffusion = apvts.getRawParameterValue(DIFFUSION)->load();
     settings.decay = apvts.getRawParameterValue(DECAY)->load();
     settings.freezeMode = apvts.getRawParameterValue(FREEZE_MODE)->load();
+    settings.damping = apvts.getRawParameterValue(DAMPING)->load();
+    settings.dampingFreq = apvts.getRawParameterValue(DAMPING_FREQ)->load();
+    settings.roomSize = apvts.getRawParameterValue(GAIN)->load();
+    settings.width = apvts.getRawParameterValue(WIDTH)->load();
     settings.reverse = apvts.getRawParameterValue(REVERSE)->load();
     
     return settings;
@@ -505,10 +518,41 @@ juce::AudioProcessorValueTreeState::ParameterLayout CompSoundFinalProjectAudioPr
                                                            juce::NormalisableRange<float>(0.f, 1.f, 0.1f, 1.f),
                                                            0.5f));
     layout.add(std::make_unique<juce::AudioParameterFloat>(
-                                                           ROOM_SIZE,
-                                                           ROOM_SIZE,
+                                                           WET_LEVEL,
+                                                           WET_LEVEL,
                                                            juce::NormalisableRange<float>(0.f, 1.f, 0.1f, 1.f),
                                                            0.5f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+                                                           DRY_LEVEL,
+                                                           DRY_LEVEL,
+                                                           juce::NormalisableRange<float>(0.f, 1.f, 0.1f, 1.f),
+                                                           0.5f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+                                                           DELAY_LENGTH,
+                                                           DELAY_LENGTH,
+                                                           juce::NormalisableRange<float>(0.f, 500.f, 0.1f, 0.5f),
+                                                           100.f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+                                                           EARLY_REFLECTION,
+                                                           EARLY_REFLECTION,
+                                                           juce::NormalisableRange<float>(0.f, 1.f, 0.01f, 1.f),
+                                                           0.2f));
+    
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+                                                           DIFFUSION,
+                                                           DIFFUSION,
+                                                           juce::NormalisableRange<float>(0.f, 8.f, 1.f, 1.f),
+                                                           2.f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+                                                           DECAY,
+                                                           DECAY,
+                                                           juce::NormalisableRange<float>(0.f, 1.f, 0.01f, 1.f),
+                                                           0.8f));
+    layout.add(std::make_unique<juce::AudioParameterBool>(
+                                                          FREEZE_MODE,
+                                                          FREEZE_MODE,
+                                                          false));
+    
     layout.add(std::make_unique<juce::AudioParameterFloat>(
                                                            DAMPING,
                                                            DAMPING,
@@ -519,47 +563,24 @@ juce::AudioProcessorValueTreeState::ParameterLayout CompSoundFinalProjectAudioPr
                                                            DAMPING_FREQ,
                                                            juce::NormalisableRange<float>(200.f, 4000.f, 10.f, 1.f),
                                                            1000.f));
-
     layout.add(std::make_unique<juce::AudioParameterFloat>(
-                                                           WET_LEVEL,
-                                                           WET_LEVEL,
+                                                           ROOM_SIZE,
+                                                           ROOM_SIZE,
                                                            juce::NormalisableRange<float>(0.f, 1.f, 0.1f, 1.f),
                                                            0.5f));
-    layout.add(std::make_unique<juce::AudioParameterFloat>(
-                                                           DRY_LEVEL,
-                                                           DRY_LEVEL,
-                                                           juce::NormalisableRange<float>(0.f, 1.f, 0.1f, 1.f),
-                                                           0.5f));
+    
     layout.add(std::make_unique<juce::AudioParameterFloat>(
                                                            WIDTH,
                                                            WIDTH,
                                                            juce::NormalisableRange<float>(0.f, 1.f, 0.1f, 1.f),
                                                            0.5f));
     
-    layout.add(std::make_unique<juce::AudioParameterFloat>(
-                                                           DELAY_LENGTH,
-                                                           DELAY_LENGTH,
-                                                           juce::NormalisableRange<float>(0.f, 500.f, 0.1f, 0.5f),
-                                                           30.f));
-    layout.add(std::make_unique<juce::AudioParameterFloat>(
-                                                           DIFFUSION,
-                                                           DIFFUSION,
-                                                           juce::NormalisableRange<float>(0.f, 8.f, 1.f, 1.f),
-                                                           4.f));
-    layout.add(std::make_unique<juce::AudioParameterFloat>(
-                                                           DECAY,
-                                                           DECAY,
-                                                           juce::NormalisableRange<float>(0.f, 1.f, 0.01f, 1.f),
-                                                           0.8f));
     layout.add(std::make_unique<juce::AudioParameterBool>(
-                                                          FREEZE_MODE,
-                                                          FREEZE_MODE,
+                                                          REVERSE,
+                                                          REVERSE,
                                                           false));
-    layout.add(std::make_unique<juce::AudioParameterBool>(
-                                                          REVERSE,
-                                                          REVERSE,
-                                                          true));
-
+    
+    
     return layout;
 }
 
